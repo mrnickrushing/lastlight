@@ -10,13 +10,18 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-381 merged pull requests. The version column is blank where the
+386 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
-| #381 | 2026-08-10 | v168 | Record Roblox place version 168 |
+| #388 | 2026-08-11 | v171 | Repair the full Bramblewake walkthrough |
+| #387 | 2026-08-10 |  | Prove there is no second door into Play, and find the finale has no runtime |
+| #386 | 2026-08-10 | v170 | Record Roblox place version 170 |
+| #385 | 2026-08-10 | v170 | Name what a pillar does, and say where the party actually went |
+| #384 | 2026-08-10 |  | Wire the Crown's three fights, and stop Cinderfall falling back to one fixed walk |
+| #382 | 2026-08-10 |  | Record Roblox place version 168 (#381) |
 | #381 | 2026-08-10 | v168 | Give enemies a real light so they render solid at night, not just an outline |
 | #380 | 2026-08-10 |  | Record Roblox place version 167 (#379) |
 | #379 | 2026-08-10 | v167 | Replace the ten crafting benches with one crafting table |

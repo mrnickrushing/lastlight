@@ -161,6 +161,81 @@ local function applyProfileScale(model: Model, profileScale: Vector3)
     end
 end
 
+type PartOrientationFix = {
+    matchSize: { number },
+    localRotationDegrees: { number }?,
+    copyOrientationFromSize: { number }?,
+}
+
+-- Sizes are compared with a small epsilon rather than exactly: they survive
+-- the LoadAsset round-trip bit-for-bit in practice, but a Union's Size is
+-- derived geometry and float noise on the order of 1e-5 has been observed
+-- between otherwise-identical loads.
+local SIZE_MATCH_EPSILON = 0.01
+
+local function sizeCloseEnough(a: Vector3, b: { number }): boolean
+    return math.abs(a.X - b[1]) <= SIZE_MATCH_EPSILON
+        and math.abs(a.Y - b[2]) <= SIZE_MATCH_EPSILON
+        and math.abs(a.Z - b[3]) <= SIZE_MATCH_EPSILON
+end
+
+local function findPartBySize(model: Model, size: { number }, exclude: BasePart?): BasePart?
+    for _, descendant in model:GetDescendants() do
+        if
+            descendant:IsA("BasePart")
+            and descendant ~= exclude
+            and sizeCloseEnough(descendant.Size, size)
+        then
+            return descendant
+        end
+    end
+    return nil
+end
+
+-- Runs once per template load (see the field comment on
+-- MeshAssetRegistry.Entry.partOrientationFixes for why this is not the same
+-- job as sourceYawDegrees). Matching by Size rather than by name or index
+-- because Creator Store imports generally don't carry stable, descriptive
+-- part names -- Size is the one property that's both distinctive enough to
+-- pick out one part among a model's siblings and untouched by anything this
+-- loader does before this point in the pipeline.
+local function applyPartOrientationFixes(
+    model: Model,
+    fixes: { PartOrientationFix }?,
+    logger: Logger,
+    stableId: string
+)
+    if fixes == nil then
+        return
+    end
+    for _, fix in fixes do
+        local target = findPartBySize(model, fix.matchSize)
+        if target == nil then
+            logger:info("mesh_orientation_fix_part_not_found", {
+                assetId = stableId,
+                matchSize = tostring(fix.matchSize),
+            })
+            continue
+        end
+        if fix.localRotationDegrees ~= nil then
+            local r = fix.localRotationDegrees
+            target.CFrame = target.CFrame
+                * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
+        elseif fix.copyOrientationFromSize ~= nil then
+            local reference = findPartBySize(model, fix.copyOrientationFromSize, target)
+            if reference == nil then
+                logger:info("mesh_orientation_fix_reference_not_found", {
+                    assetId = stableId,
+                    matchSize = tostring(fix.copyOrientationFromSize),
+                })
+                continue
+            end
+            target.CFrame = CFrame.new(target.Position)
+                * (reference.CFrame - reference.CFrame.Position)
+        end
+    end
+end
+
 function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
     return setmetatable({
         _logger = logger,
@@ -273,6 +348,11 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         -- PrimaryPart carrying its own rotation, which Creator Store models do.
         loaded:PivotTo(loaded:GetPivot() * CFrame.Angles(0, -math.rad(sourceYaw), 0))
     end
+    -- Per-part corrections (a sub-part authored wrong relative to the rest
+    -- of the SAME asset) run after the whole-model yaw cancel above and
+    -- before the bounding box is measured, so a corrected part's true
+    -- extents are what normalization and every later placement see.
+    applyPartOrientationFixes(loaded, entry.partOrientationFixes, self._logger, stableId)
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)

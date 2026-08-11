@@ -78,6 +78,20 @@ end
     should never be able to route around the working half of the city,
     because deciding which memories to trust is the region and the lit
     modules are where the false ones are made.
+
+    Twenty of the thirty carry a point-of-interest socket and twenty-seven
+    an event socket, which is the density every earlier region was
+    authored at and the reason this one now generates. The Crown shipped
+    with thirteen and twenty-four, and a run draws twelve modules that
+    have to seat four points of interest and eight events between them --
+    at that density the greedy fill misses often enough that 132 seeds in
+    2,000 failed validation three times and were answered with the
+    known-good fallback. Nothing failed and nothing logged; the region
+    simply served one fixed layout to whoever drew an unlucky seed. Only
+    the arrival, the extraction and the Regent's approach are socketless,
+    for the reason they are in every region: the first look at a region
+    should be the region, the way out should be the way out, and the
+    boss's doorstep belongs to the boss.
 ]]
 local Strings = require("../../Strings")
 
@@ -202,7 +216,7 @@ local modules = {
         role = "traversal",
         visual = "parade_route",
         tags = { "traversal", "memory" },
-        poiSocket = false,
+        poiSocket = true,
         eventSocket = true,
         partBudget = 44,
         lightBudget = 2,
@@ -238,8 +252,8 @@ local modules = {
         role = "traversal",
         visual = "ash_colonnade",
         tags = { "traversal", "safe" },
-        poiSocket = false,
-        eventSocket = false,
+        poiSocket = true,
+        eventSocket = true,
         partBudget = 36,
         lightBudget = 2,
         effectBudget = 1,
@@ -274,7 +288,7 @@ local modules = {
         role = "combat",
         visual = "applause_court",
         tags = { "combat", "memory" },
-        poiSocket = false,
+        poiSocket = true,
         eventSocket = true,
         partBudget = 46,
         lightBudget = 2,
@@ -286,7 +300,7 @@ local modules = {
         role = "combat",
         visual = "knight_gallery",
         tags = { "combat", "risk" },
-        poiSocket = false,
+        poiSocket = true,
         eventSocket = true,
         partBudget = 44,
         lightBudget = 2,
@@ -334,8 +348,8 @@ local modules = {
         role = "connector",
         visual = "ash_lane",
         tags = { "connector", "safe" },
-        poiSocket = false,
-        eventSocket = false,
+        poiSocket = true,
+        eventSocket = true,
         partBudget = 28,
         lightBudget = 2,
         effectBudget = 1,
@@ -358,8 +372,8 @@ local modules = {
         role = "connector",
         visual = "crown_arch",
         tags = { "connector", "story" },
-        poiSocket = false,
-        eventSocket = false,
+        poiSocket = true,
+        eventSocket = true,
         partBudget = 32,
         lightBudget = 2,
         effectBudget = 1,
@@ -424,7 +438,7 @@ local modules = {
         role = "puzzle",
         visual = "statue_line",
         tags = { "puzzle", "memory" },
-        poiSocket = false,
+        poiSocket = true,
         eventSocket = true,
         partBudget = 44,
         lightBudget = 2,
@@ -909,6 +923,17 @@ return table.freeze({
     }),
     RequiredModuleIds = table.freeze({
         "module_cc_regent_approach",
+    }),
+    --[[
+        The Crown's two memory fragments anchor to these, and four points
+        of interest drawn from nine is a coin flip either beat can lose.
+        The Reach paid for this rule with a live walk that arrived with a
+        fragment missing; the Crown pays nothing, because it is pinned
+        before anyone walks it.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_cc_last_ovation",
+        "poi_cc_name_wall",
     }),
     FixedMiddleIds = table.freeze({
         "module_cc_warm_arcade",

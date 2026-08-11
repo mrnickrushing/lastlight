@@ -4569,13 +4569,29 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         --[[
             Spaced so the seventh plank still hangs above the floor. The
             first pass stepped 1.9 studs from 11.4 and put Cinderfall's
-            plank level with the boards and the Hollow's inside them.
+            plank level with the boards and the Hollow's inside them; the
+            second stepped 1.55 from 12.3, which leaves THE HOLLOW's
+            bottom edge at 0.80 -- buried again, small enough to look
+            intentional, the same defect one plank later.
+
+            The floor it has to clear is 1.06, not the 1.00 the last
+            measurement used: `LodgeFloor` is a 1-stud slab centred at
+            0.5, so its top is 1.00, but `LodgeFloorPlank` lays boards
+            0.08 thick centred at 1.02 on top of it, and the boards are
+            what a player stands on. Measuring the slab and forgetting
+            the boards is how a plank clears its floor on paper and sinks
+            into it in the room.
+
+            The pitch was right both times and only the origin was low,
+            so only the origin moves: every plank above keeps its
+            spacing, and the seventh now sits with 0.19 studs of daylight
+            under it.
         ]]
         local plank = part(
             destinationBoard,
             "DestinationPlank",
             Vector3.new(0.6, 1.3, 8.6),
-            CFrame.new(boardAt + Vector3.new(0.9, 12.3 - index * 1.55, 0)),
+            CFrame.new(boardAt + Vector3.new(0.9, 12.75 - index * 1.55, 0)),
             if region.enabled == true
                 then Color3.fromRGB(122, 92, 56)
                 else Color3.fromRGB(64, 58, 52),
@@ -8059,6 +8075,21 @@ function WorldService.departurePlatform(self: WorldService): (Vector3, number)
         return DEPARTURE_PLATFORM_CENTER, DEPARTURE_PLATFORM_RADIUS
     end
     return platform.Position, DEPARTURE_PLATFORM_RADIUS
+end
+
+--[[
+    Which region this server's expedition is standing in. Both build
+    paths record the manifest they raised, so Bramblewake answers here
+    too; before either has run there is no expedition yet and the caller
+    gets nil rather than a guess.
+]]
+function WorldService.expeditionRegionId(self: WorldService): string?
+    local manifest = self._expeditionManifest
+    if type(manifest) ~= "table" then
+        return nil
+    end
+    local regionId = manifest.regionId
+    return if type(regionId) == "string" then regionId else nil
 end
 
 function WorldService.arrivalSpawnPosition(self: WorldService): Vector3
@@ -14332,6 +14363,12 @@ function WorldService.blackoutArena(self: WorldService): any
     return self._blackoutArena
 end
 
+function WorldService.blackoutStatus(self: WorldService): string?
+    local world = self._world
+    local status = if world ~= nil then world:GetAttribute("BlackoutStatus") else nil
+    return if type(status) == "string" then status else nil
+end
+
 function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     local arena = self._blackoutArena
     local world = self._world
@@ -14401,7 +14438,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             marker.Size = UDim2.fromOffset(190, 40)
             marker.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
             -- The relay legs are 120, 228, and 161 studs, and the carry timer
-            -- is 18 seconds. At the old MaxDistance of 70 the marker only
+            -- is still deliberately urgent. At the old MaxDistance of 70 the marker only
             -- appeared once a carrier was already most of the way there, so
             -- the one thing that says "this way" could not be seen from where
             -- the fire is taken. 500 covers every leg from anywhere on the

@@ -508,6 +508,9 @@ function RegionExpeditionAssembly.build(
         local crowded = #definition.anchors >= 10
         local dense = #definition.anchors >= 13
         local anchorLabelReach = if dense then 20 elseif crowded then 26 else 40
+        -- The wiring decides what each anchor is called, because that is
+        -- the half a suite with no Instances can hold.
+        local anchorLabels = RegionEncounterWiring.anchorLabels(definition)
         for metaIndex, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
@@ -517,7 +520,7 @@ function RegionExpeditionAssembly.build(
                     else 5.5
                 billboardLabel(
                     anchorPart,
-                    meta.object,
+                    anchorLabels[meta.id] or meta.object,
                     look.arenaAnchor,
                     anchorLabelReach,
                     labelHeight

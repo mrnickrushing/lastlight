@@ -150,6 +150,126 @@ failure message. It does not cover Wine itself — the stub never runs a real
 precisely the gap bugs 3 and 4 lived in; whether the server actually launches
 and speaks JSON-RPC still needs the machine Studio runs on.
 
+#### The relay hosts the socket; Studio dials it
+
+This one is worth more than the four above put together, because it makes the
+difference between a session that can see the game and one that cannot, and
+every symptom it produces reads as "Studio is broken".
+
+**Studio is the WebSocket *client*.** Its own log shows the direction plainly:
+
+```console
+[DFLog::WebSocketTraceError] ws: 61 url: http://localhost:13469/studio error: HttpError: ConnectFail
+```
+
+Studio retries that connection every three seconds, forever. `StudioMCP.exe` is
+what *hosts* port 13469. So the relay process has to **outlive individual tool
+calls**: a client that spawns the wrapper per call, or any wrapper that exits
+between calls, tears the host down before Studio finishes dialling it, and every
+call answers `Not connected to the WS host` — which looks exactly like a Studio
+that has not finished loading, and waiting longer never helps. A long-lived MCP
+session is not an optimization here, it is the protocol.
+
+**A latched `start_stop_play` is cleared by restarting the relay, not Studio.**
+The previous handoff recorded that only a Studio restart clears it. It does not:
+killing `StudioMCP.exe` and reconnecting gives a responsive session with Studio
+left alone and its place still loaded, which turns a four-minute recovery into a
+ten-second one.
+
+#### Play mode is unreachable on a Wayland session, and this is why
+
+Measured on 2026-08-10, KDE Plasma on Wayland with a rootless Xwayland
+(`/usr/bin/Xwayland :1 ... -rootless -enable-ei-portal`). **No synthetic input
+reaches Studio by any route**, so the Play button cannot be pressed:
+
+| Route | Result |
+|---|---|
+| `xdotool key --window <wid> F5` (XSendEvent) | ignored |
+| `xdotool key F5` (XTEST) | ignored |
+| A real `/dev/uinput` virtual keyboard | ignored |
+
+The uinput device is genuinely created and seated — it appears in
+`/proc/bus/input/devices` with `Handlers=kbd mouse2 event17` — and it still
+changes nothing. Two independent witnesses confirm the input never reaches the
+compositor's focus chain rather than being dropped by Studio: Studio's own log
+reports `No user input within the last 5000 ms` throughout, and pressing **Meta**
+does not open KDE's launcher either.
+
+**The trap is that the pointer half of XTEST works.** `xdotool mousemove` moves
+the cursor and `getmouselocation` reports the new position, so input looks alive
+while every keystroke and click is going nowhere. Do not take a moving cursor as
+evidence.
+
+The cause is `-enable-ei-portal`: XTEST from X clients is routed through the
+RemoteDesktop portal, and granting that portal needs a dialog that can only be
+clicked by somebody at the machine. So `start_stop_play` never completes (it
+answers `Start play hasn't finished yet` forever) and `F5` never lands.
+
+#### The relay is healthy while this happens, and the input tools cannot rescue it
+
+Measured again on 2026-08-10, over two attempts that were each a full teardown
+(`pkill -9` on `RobloxStudioBeta.exe`, `StudioMCP.exe`, `wineserver`,
+`winedevice.exe`, `AutoSaves/*.rbxl` cleared), a freshly built place, a freshly
+launched Studio, one long-lived relay established and confirmed with
+`list_roblox_studios` before anything else, and **exactly one**
+`start_stop_play` call. Both latched identically. Three things this pins down,
+because each of them was a plausible way out before it was measured:
+
+**The relay is not the cause, and fixing the relay does not fix this.** While
+`start_stop_play` sat outstanding, `get_studio_state`, `execute_luau` and
+`list_roblox_studios` all answered in under a second, repeatedly, for the whole
+of both attempts. The section above is still true and still worth obeying — a
+relay that exits between calls really does produce `Not connected to the WS
+host` — but a relay that behaves perfectly produces this instead. The two
+failures look nothing alike once you can tell them apart: a dead relay fails
+*every* call, and this fails exactly one.
+
+**Studio is in a state with nothing wrong with it.** Authenticated (`login
+[end][success]`), window mapped at 1916x1002 and `Qt::ApplicationActive`, the
+place fully loaded and answering `execute_luau` about its own contents. The one
+other window Studio owns is a 519x130 dialog that `xwininfo` reports as `Map
+State: IsUnMapped`, so the Auto-Recovery modal described below is **not** what
+is happening here. And Studio's own log records **no playtest activity at all**
+across either attempt — no Play DataModel, no plugin load for one, nothing but
+session heartbeats and autosave ticks. It is not trying and failing; nothing
+reaches it.
+
+**`user_mouse_input` and `user_keyboard_input` cannot be used to get into Play,
+because they only exist inside it.** Both declare `datamodel_type` with
+`"enum": ["Client"]` — a single permitted value, and the Client DataModel does
+not exist in Edit mode. Their own description says to "consider using
+`start_stop_play` to switch to the desired mode and then use the tools". They
+are strictly downstream of the call that is broken. This is worth stating
+outright because the opposite is the natural guess: earlier successful region
+walks did drive gameplay with these tools, which reads as evidence that they
+are a route *to* Play, when in fact every one of those sessions had already got
+into Play some other way first. **There is no second door.**
+
+For completeness, `execute_luau` runs at **plugin security** — `settings()`,
+`StudioService` and `RunService.Run` are all reachable from it. That is a
+larger surface than it looks and it still does not help: `RunService:Run()`
+starts simulation inside the Edit DataModel with no client and no player, and
+nothing at plugin level can manufacture a `LocalPlayer`. A walk needs a
+character to stand somewhere and a prompt to be pressed by one, so Run mode is
+the Edit-mode split below with physics on, not a walk.
+
+**What this costs, stated plainly: there is no Play mode, so there is no live
+walk, so no region can have its flag flipped.** A region ships open only in the
+pull request of its own live walk, and that gate cannot be cleared from a session
+in this state. Ask the owner to press Play at the keyboard, or run the session on
+a seat where input is not portal-gated.
+
+**What still works is the entire Edit datamodel**, and it is more than it sounds:
+`execute_luau` against the real place, `screen_capture` from an arbitrary camera
+position, `search_game_tree`, `inspect_instance`. That is enough to build a
+region for real inside Roblox's own VM, drive the pure encounter modules through
+their full state machines against the shared wiring, sweep thousands of
+generation seeds in the engine rather than in Lune, and photograph the result at
+player height in any lighting. It is **not** a walk — no player character, no
+server-validated interaction, no real click — and a session that blurs those two
+is worth less than one that verifies nothing, because the next reader cannot tell
+which it did.
+
 ### 3. Confirm it is actually connected
 
 Open `build/LastLight.rbxlx` in Studio, start a session in the repository root,

@@ -43,6 +43,7 @@ return {
         {
             name = "requires carried fire at three distinct relay nodes",
             run = function()
+                TestRunner.equal(BramblewakeBlackout.FireCarrySeconds, 30)
                 local state = relayReady()
                 local unchanged, missing =
                     BramblewakeBlackout.deliverFire(state, 10, "blackout_root_farm", 101)
@@ -50,7 +51,7 @@ return {
                 TestRunner.equal(missing.reason, "fire_required")
                 state = BramblewakeBlackout.takeFire(state, 10, 101)
                 local expiredState, expired =
-                    BramblewakeBlackout.deliverFire(state, 10, "blackout_root_farm", 121)
+                    BramblewakeBlackout.deliverFire(state, 10, "blackout_root_farm", 132)
                 TestRunner.equal(expiredState, state)
                 TestRunner.equal(expired.reason, "fire_expired")
                 state = BramblewakeBlackout.deliverFire(state, 10, "blackout_root_farm", 110)

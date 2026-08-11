@@ -7,8 +7,24 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #381, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 168;
+Last updated: 2026-08-11, at `main` = PR #388, build `0.53.2`, save schema 25,
+27 services. Published to Roblox as place version 171;
+**#387 leaves Cinderfall shut for the third wave running, and closes the
+last route anybody had left to try.** Play mode is unreachable on this
+machine, and the two things that looked like ways around it are now
+measured shut: the relay is provably healthy while `start_stop_play`
+latches, and `user_mouse_input`/`user_keyboard_input` are
+`datamodel_type` **`Client` only**, so they live inside Play rather than
+leading to it (the evidence is in
+[STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md)). It also records the thing
+reading found instead: **the Hollow Below has no runtime at all**, so the
+finale is a wave rather than a walk. #385 leaves Cinderfall shut for the
+second wave running and names the same reason, and ships the arena label
+defect that reading found instead, in the Crown *and* in Tempest, which is
+already open. #384 wires Cinderfall's three encounters and fixes
+the generation fallback that made one Crown run in fifteen the same fixed
+layout, and deliberately leaves the region shut, because its live walk was
+never finished.
 `0.53.1` is published from PR #381, which gave every enemy a real light so
 its authored PBR mesh renders solid at night instead of going black behind
 only the ThreatOutline's rim — the owner's own description was "invisible
@@ -109,6 +125,290 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#388** (v171) **The complete physical
+  Bramblewake walk found route, readability, feedback and performance defects,
+  and build `0.53.2` repairs them as one coherent pass.** The source clears tall
+  procedural collision at every module seam, moves the first resource prompt
+  away from the first relay, extends carried Rootfire from 18 to 30 seconds,
+  makes overtime recovery explicit, and replaces the false successful-return
+  Mara line after an unfinished Blackout. It also corrects the inverted lantern
+  cap and forest sign subparts, seats bridge interactions on the bridge deck,
+  reduces camera-blocking and shadow-casting dressing, strengthens the farm
+  landmark, and scales back the Wayhome gate's neon beacon. The phone Blackout
+  HUD is shorter and removes duplicate detail while the crisis rail is active.
+
+  The generated-place budget drops from 2,600 to 2,200 parts. The wrapper's
+  executable-stub suite now works when the desktop TMPDIR is mounted `noexec`,
+  and all 21 Wine/Vinegar launch cases pass. A fresh Codex-owned stdio session
+  listed and selected the open `LastLight.rbxlx` Studio and queried its live
+  Client/Server DataModels; the already-running Play DataModel is the older
+  `0.53.1`/18-second build, so it is retained only as pre-fix evidence rather
+  than mislabeled as post-fix verification. The merged commit `e59f7ae` passed
+  the complete suite again on synchronized `main`, and Open Cloud published
+  that exact regenerated artifact to start place `115897110071287` as **place
+  version 171**.
+- **#387** **The Crown stays shut a third time, and this wave spends itself
+  proving there is no way round rather than looking for one.** Cinderfall was
+  queued to open again. `Regions.luau`, `RegionBuilders.walkable`, the feature
+  flag and its rollout stage are all untouched, and the four specs that pin the
+  open set by name still pin five. **A region never ships enabled but unwalked**,
+  and this is the third session in a row where the walk could not be started at
+  all.
+
+  **Two clean attempts, and "clean" is the whole of the claim.** Each one was a
+  full teardown (`pkill -9` on `RobloxStudioBeta.exe`, `StudioMCP.exe`,
+  `wineserver`, `winedevice.exe`, `AutoSaves/*.rbxl` removed), a place rebuilt
+  from this revision, a freshly launched Studio, **one** relay started and
+  confirmed with `list_roblox_studios` before anything else, and **exactly one**
+  `start_stop_play` call. Both latched. Studio stayed in Edit with `Available
+  DataModels: Edit` throughout, and its own log recorded **no playtest activity
+  whatsoever** — no Play DataModel, no plugin load for one, only session
+  heartbeats and autosave ticks. It is not trying and failing; the request
+  reaches nothing.
+
+  **The relay theory is now disproved rather than untested, and that matters
+  because it was the best hope going in.** #385 established that the relay must
+  outlive individual tool calls, which is true and stays in the runbook. It is
+  not this. While `start_stop_play` sat outstanding, `get_studio_state`,
+  `execute_luau` and `list_roblox_studios` each answered in under a second,
+  repeatedly, for the whole of both attempts. A dead relay fails *every* call;
+  this fails exactly one, which is how you tell them apart and why the two were
+  confused for a session and a half.
+
+  **The find that actually closes the question is one line of a tool schema.**
+  `user_mouse_input` and `user_keyboard_input` both declare `datamodel_type`
+  with `"enum": ["Client"]` — one permitted value, and the Client DataModel does
+  not exist in Edit mode. Their own descriptions say to use `start_stop_play`
+  first. **They are downstream of the broken call, not around it.** The natural
+  reading of the earlier successful walks is the exact opposite — those sessions
+  really did drive Bramblewake, the Delve, the Fen, the Reach and the Vale with
+  these tools — but every one of them was already in Play before it touched one.
+  There is no second door, and the next session should not spend itself looking
+  for one. `execute_luau` does run at **plugin security** (`settings()`,
+  `StudioService` and `RunService.Run` are all reachable), which is a wider
+  surface than anyone had claimed and still not a way in: `RunService:Run()` is
+  simulation inside the Edit DataModel with no client, and nothing at plugin
+  level can manufacture a `LocalPlayer`. A walk needs a character to stand
+  somewhere and a prompt pressed by one.
+
+  **What reading found instead is bigger than the Crown, and it was queued as if
+  it were small.** The Hollow Below was next on the list after Cinderfall, on
+  the understanding that its encounter logic had already been driven through all
+  five scenes to all three endings and only a live walk was missing. The logic
+  has been; the walk is not what is missing. **Nothing in the running game can
+  reach the Hollow**, because nothing in the running game knows about it.
+  `NamelessNightEncounter` is required by `SaveSchema` (which reserves its
+  fields) and `Epilogue` (which reads them) and **by nothing else in `src`** —
+  no service among the 27, no builder, no `RegionBuilders` entry at all, so
+  `RegionBuilders.readiness("region_hollow")` answers `unknown region` rather
+  than `walkable = false`. `RegionEncounterWiring` handles five regions and the
+  Hollow is not one; `boss_nameless_night` appears in the chapter catalog, the
+  finale definition and its own module, and in no wiring anywhere.
+  `RegionExpeditionAssembly` names the region only to give it a display string.
+  So the finale is **content without a runtime**: fully authored — five scenes,
+  its points of interest, three endings, chapter seven — fully saved, fully read
+  by the epilogue, and unreachable. That is the shape this project has paid for
+  four times already (120 recipes with no bench, 24 residents with no body,
+  ninety craftable items with no equip button, the 55 localization keys nothing
+  resolves), and it is worth writing down loudly: **the Hollow is a wave, not a
+  walk**, and no amount of Play mode would have produced one this session.
+
+  Nothing under `src/` changes here, so the built place is byte-identical to the
+  one #386 published and place version 170 still stands. **942 Luau tests**,
+  every repository validator green.
+
+  **Open, and now needing a person rather than another attempt:** Play mode
+  cannot be entered from a session on this seat, by any route that exists —
+  `start_stop_play` latches with the relay healthy and Studio idle, the native
+  input tools are `Client`-only and so live inside Play rather than leading to
+  it, and OS-level injection is portal-gated shut (#385). **The Crown, and every
+  region after it, needs somebody at the keyboard to press Play**, or a seat
+  where input is not portal-gated. Three sessions have now confirmed this from
+  three different directions and the cost of a fourth is a whole session.
+
+  **Open, and larger than it was queued as:** the Hollow Below has no runtime.
+  It is authored, saved and read by the epilogue, and no service, builder,
+  encounter wiring or region-builder entry knows it exists, so it cannot be
+  reached in any build regardless of Play mode. Chapter seven is unreachable and
+  the game therefore has no ending a player can arrive at. Building that runtime
+  is the last real feature in the project and it was not on the queue, because
+  the finale's own module passing its specs read as the finale being finished.
+- **#386** (v170) The place-version record for #385. The merged commit `cf55c16`
+  was rebuilt on synchronized `main`, passed 942 Luau tests and every repository
+  validator, and Open Cloud published that artifact to start place
+  `115897110071287` as **place version 170**. No source under `src/` changes
+  here, so the built place is byte-identical to the one #385 produced.
+- **#385** (v170) **The Crown stays shut a second time, and this session can say
+  exactly why: there is no Play mode on this machine.** Cinderfall was queued to
+  open again and it does not open here either. `Regions.luau`,
+  `RegionBuilders.walkable`, the feature flag and its rollout stage are all
+  untouched, and the specs that pin the open set still pin five. **A region never
+  ships enabled but unwalked**, and the walk was not merely unfinished this
+  time — it was unstartable.
+
+  **The blocker was found rather than suffered, and it is written down so the
+  next session does not pay for it again.** Two facts, both measured:
+
+  *The relay hosts the socket; Studio dials it.* Studio's own log shows it
+  retrying `http://localhost:13469/studio` every three seconds forever, and
+  `StudioMCP.exe` is what listens there. So the MCP server process has to
+  **outlive individual tool calls** — a relay that exits between calls tears the
+  host down before Studio finishes connecting, and every call answers `Not
+  connected to the WS host`, which is indistinguishable from a Studio still
+  loading its place. That is the whole of last session's "Studio stopped
+  responding". A long-lived session connects on the first try. And a latched
+  `start_stop_play` is cleared by **restarting the relay, not Studio**, which the
+  last handoff had recorded the other way round.
+
+  *No synthetic input reaches Studio at all.* This desktop is KDE on Wayland with
+  a rootless Xwayland started `-enable-ei-portal`. `xdotool key --window`
+  (XSendEvent), plain `xdotool key` (XTEST) and a real `/dev/uinput` virtual
+  keyboard all land nowhere — and the uinput device is genuinely created and
+  seated, `Handlers=kbd mouse2 event17`. Two witnesses confirm it never reaches
+  the compositor rather than being dropped by Studio: Studio logs `No user input
+  within the last 5000 ms` throughout, and **KDE's own Meta key does not open the
+  launcher**. The trap is that the pointer half of XTEST works — `mousemove`
+  moves the cursor and reports the new position — so input looks alive while
+  every keystroke goes nowhere. XTEST is portal-gated, and granting the portal
+  needs a dialog only somebody at the keyboard can click. So `F5` cannot be
+  pressed, `start_stop_play` answers `Start play hasn't finished yet` forever,
+  and **Play mode is unreachable — which means no live walk, for any region,
+  from a session in this state.**
+
+  **What Edit mode could still prove, and it is more than reading.** The Crown
+  was built for real inside Roblox's own VM through `RegionExpeditionAssembly`:
+  12 modules, 653 parts, 752 descendants, 22 harvest nodes, 19 event step
+  interactions, the three encounter sites, the rim and the wayfinding, `Ready`
+  true. **500 seeds swept in the engine rather than in Lune: 0 fallbacks, 500
+  distinct layouts, and both memory-bearing points of interest present in every
+  single run** — #384's generation fix holding where it actually ships. All three
+  fights were driven through their real wiring handlers to completion: the Actor
+  named its called beat every round (`ANSWER THE LINE — 1 OF 3 · IT CALLS THE
+  TURN`) and its missed-beat line (`THE LINE STARTS AGAIN FROM THE TOP · IT CALLS
+  THE BOW`), the Bailiff named its mark on a wrong appeal (`IT MARKED THE WEST
+  ARCADE`), and the Regent resolved chapter six **three different ways** —
+  `spared_memories/remembered`, `broke_some/recast`, `broke_them_all/erased`,
+  every one of them the decision and outcome the catalog names. That is the
+  Lantern Witch's unreachable `sealed` answered in the opposite direction: this
+  chapter's three endings are all actually reachable. Screenshots at player
+  height in day and dusk; the rim ends every sightline and the Delve's
+  pale-blank dusk wash does not recur.
+
+  **It is not a walk, and the difference is the point.** No player character, no
+  server-validated interaction, no real click, no departure board press, no
+  extraction. Which is exactly why the flag did not move.
+
+  **The find is a defect nobody could have counted, in a region that is already
+  open.** An arena labels each anchor with what it is, which is enough only while
+  no two anchors in a ring are the same thing. The Regent's box is the first that
+  breaks it: reading a statue and breaking it are deliberately separate anchors
+  and they name the same statue, so the ring built **ten pillars carrying five
+  names twice over** — and one of each pair is a free look while the other is the
+  chapter's irreversible decision, standing side by side. That is #363's "four
+  identical unlabelled pillars" returning with labels on. Writing the spec then
+  caught the same defect **in Tempest, which shipped open after a live walk**:
+  the Titan's `EASE`/`SLAM` tide gates have read identically since the Reach
+  opened, and nobody filed it. The verb joins the label only where the object is
+  ambiguous, so every ring already walked reads exactly as it was walked; the
+  decision moved into `RegionEncounterWiring.anchorLabels` because the assembly
+  builds Instances and the suite cannot. **The first draft of that spec was a
+  list of regions and the list was wrong**, which is how Tempest was found.
+
+  **The three defects #384 recorded are fixed.** The departure toast reads the
+  region the world actually raised instead of saying `LEFT FOR EMBERHOLLOW` on
+  every departure. The boss-unlock toast asks the boss what to call itself
+  (`ASH REGENT HAS STOPPED WAITING`) instead of `SOMETHING BELOW`, which was
+  written for the Maw and inherited by a Crown whose boss is above you. And the
+  seventh destination plank clears the floor — **and the earlier measurement was
+  itself wrong**: it measured `LodgeFloor`'s 1.00 slab top and missed
+  `LodgeFloorPlank`, 0.08-thick boards centred at 1.02, so the surface a player
+  stands on is 1.06. Only the origin moves, the pitch is unchanged, and the
+  seventh plank now has 0.19 studs of daylight under it. **942 Luau tests**,
+  every repository validator green. `npm run check`'s Wine wrapper suite fails
+  19/21 in this sandbox and **fails identically on unmodified `main`** — the
+  #377 precedent, an environment gap rather than the change.
+- **#384** **The Crown's fights are wired and its region generates — and the
+  Crown stays shut, because nobody walked it.** Cinderfall was queued to open
+  and it does not open here. Studio stopped opening a window partway through
+  the session and did not come back, so the walk was never finished, so the
+  flag never moved: `Regions.luau`, `RegionBuilders.walkable`, the feature flag
+  and its rollout stage are all where they were, and the specs that pin the
+  open set still pin five. **A region never ships enabled but unwalked**, and a
+  session that cannot finish the walk ships the preparation instead — which is
+  what #363 did for Mireglass, whose wiring landed disabled one wave early.
+
+  **The half-walk that did happen paid for itself.** A live server raised the
+  region and reported `Source=known_good_fallback` — what `ExpeditionGenerator`
+  answers with after three assemble attempts fail validation. Measured across
+  seeds, the Crown fell back on **132 in 2,000**; Bramblewake, the Delve, the
+  Fen, the Reach and the Vale fall back on **none**. The cause is authoring
+  density rather than logic: a run draws twelve modules that must seat four
+  points of interest and eight events between them, and the Crown carried
+  point-of-interest sockets on **13 of its 30** modules and event sockets on 24,
+  where every earlier region carries **20 and 27**. At the sibling density it
+  generates on 2,000 seeds out of 2,000. Only the arrival, the extraction and
+  the Regent's approach stay socketless, for the reason they do everywhere.
+
+  **What a player lost was variety rather than correctness, which is why
+  nothing ever reported it.** The fallback layout is valid by construction, so
+  it walks fine; it is simply the same walk every time for whoever drew an
+  unlucky seed. **The Crown's own 2,000-seed sweep was green throughout**,
+  because it asked whether the manifest it got back was valid and never whether
+  it was the one the generator meant to build — a check passing at exactly the
+  moment the thing it covers is broken, which is #356's and #358's lesson
+  arriving from a third direction. It asks both now, and
+  `RegionBuilderCoverage` holds the same rule over the whole open set, because
+  whatever joins that set next has to arrive generating.
+
+  **Three wiring finds, all from reading the modules rather than from a spec.**
+  The Lead Actor's called beat and the Glass Bailiff's marked structure both
+  ride in snapshots no client reads — unspoken, each arena is a row of
+  identical prompts under an instruction that only counts, which is the Vale's
+  aurora order again, twice, and the Actor's own module insists its line is
+  announced "loudly, in order". Both are named in the message now. Reading a
+  statue is the only thing in the Crown that costs nothing but time, and the
+  Regent's instruction counts anchors and nothing else, so a read wired through
+  the generic wrapper would answer exactly like a read that did nothing — and
+  knowing which statues are real before breaking them is the fight's whole
+  argument. What a read learned is spoken; breaking is its own anchor, because
+  breaking a true one is the chapter's decision and cannot be taken back.
+  Three clocks live in the wiring the way the Admiral's re-rig and the Hart's
+  split do, and the Bailiff's three waits are covered by two tuning values, so
+  the unnamed one takes `sentenceSeconds` as well: the opening a party buys is
+  as long as the sentence it paid a wall for. Both memory-bearing points of
+  interest are pinned into every generated run, the rule the Reach's walk paid
+  for.
+
+  **Verified live before Studio died:** the destination board built the Crown's
+  plank and pressing it returned `THE ROAD NOW LEADS TO CINDERFALL CROWN`; the
+  departure refusals and countdown are real; the region assembled with 12
+  modules, 691 parts, 1,131 descendants, `ExtractionReady=true`, both memory
+  fragment models and the Regent's box site present. **Not verified, and so not
+  shipped open:** route seams, a gather, a POI, an event's steps, either
+  fragment recovered, either elite, the Regent's phase chain, the chapter
+  decision, extraction, and any screenshot at player height in day or dusk.
+
+  **Open, recorded rather than fixed:** the destination board's seventh plank
+  (`THE HOLLOW`) sits at y=1.45 with a 1.3-stud plank, so its bottom is 0.80
+  against a lodge floor whose top is 1.00 — 0.2 studs buried, the Delve-walk
+  defect returning one plank later, and measured rather than looked at, so it
+  is recorded instead of blind-fixed. `toast.the_party_of_n_has_left` reads
+  `THE PARTY OF %d HAS LEFT FOR EMBERHOLLOW` on every departure regardless of
+  destination. And the boss-unlock toast is `SOMETHING BELOW HAS STOPPED
+  WAITING` for every region, which reads oddly in a Crown whose boss is above
+  you in its box. **940 Luau tests**, `npm run check` a full pass including the
+  Studio-MCP wrapper suite at 21/21.
+
+  **A note for the next session, because it cost this one most of its time:**
+  Studio's own `start_stop_play` MCP tool never completes in this environment —
+  it returns `Start play hasn't finished yet` forever and latches, so only a
+  Studio restart clears it. What does work is `xdotool key --window <wid> F5`.
+  Plain `xdotool click`/`type` without `--window` reach nothing under this
+  Wayland session; `--window` sends the event to the window directly and Wine
+  accepts it. Studio also needs a full teardown (`pkill -9` on
+  `RobloxStudioBeta.exe`, `StudioMCP.exe`, `wineserver`, `winedevice`) and a
+  pause before relaunching, or it comes up with no window and never registers
+  with the MCP relay.
 - **#381** (v168) **Enemies render solid at night now, not an outline around
   nothing.** The owner's report: "the monsters look like they are invisible
   with a red line around them." Reproduced and root-caused live in Studio

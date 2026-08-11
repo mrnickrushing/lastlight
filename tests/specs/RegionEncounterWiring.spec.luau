@@ -43,6 +43,115 @@ return {
     name = "RegionEncounterWiring",
     cases = {
         {
+            --[[
+                An arena names each anchor on a billboard, and two
+                billboards reading the same words are two pillars a party
+                has to tell apart by walking to both. The Regent's box
+                shipped exactly that -- ten anchors, five names, each
+                twice, because reading a statue and breaking it name the
+                same statue -- and it is the worst place in the game for
+                it, since one of each pair is free and the other ends the
+                chapter and cannot be taken back. Held over every wired
+                region, because the rule is about arenas rather than
+                about the Crown.
+            ]]
+            name = "no two anchors in one arena are labelled the same",
+            run = function()
+                for _, regionId in
+                    {
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                        "region_cinderfall",
+                    }
+                do
+                    for _, definition in RegionEncounterWiring.definitionsFor(regionId) do
+                        local labels = RegionEncounterWiring.anchorLabels(definition)
+                        local seen: { [string]: string } = {}
+                        for _, anchor in definition.anchors do
+                            local label = labels[anchor.id]
+                            TestRunner.truthy(
+                                type(label) == "string" and #label > 0,
+                                definition.id .. "/" .. anchor.id .. " has no label"
+                            )
+                            TestRunner.equal(
+                                seen[label],
+                                nil,
+                                definition.id
+                                    .. " labels "
+                                    .. anchor.id
+                                    .. " and "
+                                    .. tostring(seen[label])
+                                    .. " both "
+                                    .. label
+                            )
+                            seen[label] = anchor.id
+                        end
+                    end
+                end
+            end,
+        },
+        {
+            --[[
+                The verb is borrowed only where it is needed. An anchor
+                whose object nothing else in its ring shares keeps exactly
+                the label its region's own live walk signed off, so this
+                cannot quietly relabel arenas a person already looked at.
+
+                Written as a rule rather than as a list of regions because
+                the first draft was a list, and the list was wrong: it
+                assumed only the Regent's box had a collision, and the
+                Titan's tide gates -- EASE and SLAM on one gate, in a
+                region that shipped open after a live walk -- have carried
+                the same one since the Reach opened.
+            ]]
+            name = "the verb joins a label only where the object is ambiguous",
+            run = function()
+                for _, regionId in
+                    {
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                        "region_cinderfall",
+                    }
+                do
+                    for _, definition in RegionEncounterWiring.definitionsFor(regionId) do
+                        local counts: { [string]: number } = {}
+                        for _, anchor in definition.anchors do
+                            counts[anchor.object] = (counts[anchor.object] or 0) + 1
+                        end
+                        local labels = RegionEncounterWiring.anchorLabels(definition)
+                        for _, anchor in definition.anchors do
+                            if counts[anchor.object] == 1 then
+                                TestRunner.equal(
+                                    labels[anchor.id],
+                                    anchor.object,
+                                    definition.id .. "/" .. anchor.id .. " was relabelled"
+                                )
+                            else
+                                TestRunner.truthy(
+                                    string.find(labels[anchor.id], anchor.action, 1, true) ~= nil
+                                        and string.find(
+                                                labels[anchor.id],
+                                                anchor.object,
+                                                1,
+                                                true
+                                            )
+                                            ~= nil,
+                                    definition.id
+                                        .. "/"
+                                        .. anchor.id
+                                        .. " shares an object and does not name its verb"
+                                )
+                            end
+                        end
+                    end
+                end
+            end,
+        },
+        {
             -- Every handler answers an anchor the arena builds, and every
             -- anchor the arena builds has a handler. Either direction
             -- broken is a prompt wired to nothing.
@@ -54,6 +163,7 @@ return {
                         "region_mireglass",
                         "region_tempest",
                         "region_frostmere",
+                        "region_cinderfall",
                     }
                 do
                     local definitions = RegionEncounterWiring.definitionsFor(regionId)
@@ -524,6 +634,304 @@ return {
                         "two aurora marks share a name"
                     )
                 end
+            end,
+        },
+        {
+            --[[
+                Both Crown elites are driven entirely by clocks the
+                modules do not keep: the Actor's broken scene closes
+                itself, and the Bailiff marks, sentences and adjourns on
+                its own. Three waits and two tuning values, so the tick is
+                the only place any of it can be wrong.
+            ]]
+            name = "the Crown's elites open their windows and the clocks close them",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_cinderfall")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+
+                local actor = byId.elite_lead_actor
+                local state = actor.module.create("run", "hash", true)
+                state = (drive(actor, state, "challenge"))
+                TestRunner.equal(state.status, "performing")
+                -- the first line is two beats, called in the module's own
+                -- order, and answering both breaks the scene
+                for _ = 1, actor.module.lineLength(state) do
+                    state = (drive(actor, state, actor.module.expectedBeat(state)))
+                end
+                TestRunner.equal(state.status, "broken")
+                -- the tick's first sight of a broken scene only starts the
+                -- clock; nothing resumes on the tick that broke it
+                TestRunner.equal(actor.tick(state, 3000), nil)
+                local resumed = actor.tick(state, 3000 + actor.module.Tuning.brokenSeconds) :: any
+                TestRunner.equal(resumed.status, "performing")
+                TestRunner.equal(resumed.linesCleared, 1)
+                -- and the window is real: a strike lands only inside it
+                local _, refused = actor.module.strike(resumed, PLAYER.UserId, 32)
+                TestRunner.equal(refused.accepted, false)
+                local hurt, landed = actor.module.strike(state, PLAYER.UserId, 32)
+                TestRunner.equal(landed.accepted, true)
+                TestRunner.equal(hurt.health, actor.module.MaxHealth - 32)
+
+                local bailiff = byId.elite_glass_bailiff
+                local court = bailiff.module.create("run", "hash", true)
+                court = (drive(bailiff, court, "challenge"))
+                TestRunner.equal(court.status, "sitting")
+                TestRunner.equal(court.marked, nil)
+                TestRunner.equal(bailiff.tick(court, 1000), nil)
+                local marked =
+                    bailiff.tick(court, 1000 + bailiff.module.Tuning.markIntervalSeconds) :: any
+                TestRunner.truthy(marked.marked ~= nil, "the Bailiff marked nothing")
+                -- an appeal keeps the wall and gives no window
+                local upheld = (drive(bailiff, marked, marked.marked))
+                TestRunner.equal(upheld.marked, nil)
+                TestRunner.equal(upheld.status, "sitting")
+                TestRunner.equal(bailiff.module.standingCount(upheld), 4)
+                -- letting one fall is the only thing that opens one
+                TestRunner.equal(bailiff.tick(upheld, 2000), nil)
+                local remarked =
+                    bailiff.tick(upheld, 2000 + bailiff.module.Tuning.markIntervalSeconds) :: any
+                TestRunner.truthy(remarked.marked ~= nil, "the Bailiff stopped marking")
+                TestRunner.equal(bailiff.tick(remarked, 3000), nil)
+                local fallen =
+                    bailiff.tick(remarked, 3000 + bailiff.module.Tuning.sentenceSeconds) :: any
+                TestRunner.equal(fallen.status, "sentencing")
+                TestRunner.equal(bailiff.module.standingCount(fallen), 3)
+                -- a blow is worth its whole self only while it is occupied
+                local _, deflected = bailiff.module.strike(upheld, PLAYER.UserId, 34)
+                local _, full = bailiff.module.strike(fallen, PLAYER.UserId, 34)
+                TestRunner.equal(full.damage, 34)
+                TestRunner.truthy(
+                    deflected.damage < full.damage,
+                    "a sitting Bailiff took a full blow"
+                )
+                -- and the court reopens, or the fight has one window in it
+                TestRunner.equal(bailiff.tick(fallen, 4000), nil)
+                local adjourned =
+                    bailiff.tick(fallen, 4000 + bailiff.module.Tuning.sentenceSeconds) :: any
+                TestRunner.equal(adjourned.status, "sitting")
+            end,
+        },
+        {
+            --[[
+                Two facts this region's fights turn on ride in snapshots
+                no client reads: which beat the Actor called, and which
+                structure the Bailiff marked. Unspoken, both arenas are a
+                row of identical prompts under an instruction that only
+                counts -- the Vale's aurora order again, twice. These
+                cases hold the seam that says them out loud.
+            ]]
+            name = "a called beat and a marked structure are spoken, not guessed at",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_cinderfall")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+
+                local actor = byId.elite_lead_actor
+                local state, opened =
+                    drive(actor, actor.module.create("run", "hash", true), "challenge")
+                local bare = actor.module.snapshot(state, PLAYER.UserId).instruction
+                TestRunner.truthy(
+                    opened.message ~= bare,
+                    "the Actor took the stage without naming the beat it called"
+                )
+                local names: { [string]: string } = {}
+                for _, entry in actor.anchors do
+                    names[entry.id] = entry.object
+                end
+                local called = actor.module.expectedBeat(state)
+                TestRunner.truthy(
+                    string.find(opened.message, names[called], 1, true) ~= nil,
+                    "the Actor's call names no beat a player can find"
+                )
+                --[[
+                    A missed beat resets the line and changes nothing else,
+                    so the generic wrapper answers a party that just lost
+                    its progress with the instruction it started on.
+                ]]
+                local wrong = called
+                for _, beatId in actor.module.BeatIds do
+                    if beatId ~= called then
+                        wrong = beatId
+                    end
+                end
+                local lost, missed = drive(actor, state, wrong)
+                TestRunner.equal(missed.accepted, false)
+                TestRunner.equal(lost.position, 0)
+                TestRunner.truthy(
+                    missed.message ~= bare,
+                    "a missed beat answered with the line's own opening instruction"
+                )
+
+                local bailiff = byId.elite_glass_bailiff
+                local court = (
+                    drive(bailiff, bailiff.module.create("run", "hash", true), "challenge")
+                )
+                -- the first tick only starts the clock, so a mark takes two
+                -- of them here the same way it does in the fight
+                bailiff.tick(court, 1000)
+                local marked =
+                    bailiff.tick(court, 1000 + bailiff.module.Tuning.markIntervalSeconds) :: any
+                local structureNames: { [string]: string } = {}
+                for _, entry in bailiff.anchors do
+                    structureNames[entry.id] = entry.object
+                end
+                -- appealing the wrong wall has to say which one it wanted,
+                -- because the refusal is "not that one", not "nothing"
+                local other = marked.marked
+                for _, structureId in bailiff.module.StructureIds do
+                    if structureId ~= marked.marked then
+                        other = structureId
+                    end
+                end
+                local _, wrongWall = drive(bailiff, marked, other)
+                TestRunner.equal(wrongWall.accepted, false)
+                TestRunner.truthy(
+                    string.find(wrongWall.message, structureNames[marked.marked], 1, true) ~= nil,
+                    "the Bailiff refused an appeal without naming what it marked"
+                )
+            end,
+        },
+        {
+            --[[
+                The Regent's whole chain -- read a statue, break enough of
+                its anchors, strike the phase down, four times over -- and
+                the chapter's decision, which is nothing but a count of
+                the true faces a party smashed on the way. Driven the
+                honest way first: every phase offers three false statues,
+                so the Crown can always be finished without erasing
+                anybody, and a run that cannot would be a chapter with one
+                real ending.
+            ]]
+            name = "the Regent falls through its verbs and the broken statues resolve chapter six",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_cinderfall")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+                local regent = byId.boss_ash_regent
+                TestRunner.truthy(regent.lockedUntil ~= nil, "the Regent must wait on the elites")
+
+                local state = regent.module.create("run", "hash", true)
+                TestRunner.equal(state.status, "locked")
+                state = select(1, regent.module.unlock(state))
+                state = (drive(regent, state, "challenge"))
+                TestRunner.equal(state.status, "anchored")
+
+                for phase = 1, 4 do
+                    TestRunner.equal(state.phase, phase)
+                    local authentic: { [string]: boolean } = {}
+                    for _, statueId in regent.module.authenticIds(phase) do
+                        authentic[statueId] = true
+                    end
+                    local casts = 0
+                    for _, statueId in regent.module.StatueIds do
+                        if not authentic[statueId] and state.status == "anchored" then
+                            -- read it first, which is what makes the
+                            -- choice a choice rather than a coin flip
+                            local read, learned = drive(regent, state, statueId)
+                            TestRunner.equal(learned.accepted, true)
+                            state = read
+                            state = (drive(regent, state, statueId .. "_break"))
+                            casts += 1
+                        end
+                    end
+                    TestRunner.equal(casts, 3, "a phase with no honest way through it")
+                    TestRunner.equal(state.status, "exposed")
+                    TestRunner.equal(state.erased, 0)
+                    for _ = 1, 24 do
+                        local result
+                        state, result = regent.module.strike(state, PLAYER.UserId, 45)
+                        if result.phase > phase or result.completed then
+                            break
+                        end
+                    end
+                end
+                TestRunner.equal(state.status, "complete")
+                TestRunner.equal(regent.module.outcome(state), "remembered")
+
+                local resolve = assert(regent.chapterResolution, "the Regent resolves no chapter")
+                local resolution = resolve(state)
+                TestRunner.equal(resolution.chapterId, "chapter_six")
+                TestRunner.equal(resolution.decision, "spared_memories")
+                TestRunner.equal(resolution.outcome, "remembered")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_six", resolution.decision))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_six", resolution.outcome))
+
+                -- and the two costlier readings map to their own decisions
+                local some = table.clone(state)
+                some.erased = 1
+                TestRunner.equal(resolve(some).decision, "broke_some")
+                TestRunner.equal(resolve(some).outcome, "recast")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_six", "broke_some"))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_six", "recast"))
+                local all = table.clone(state)
+                all.erased = 3
+                TestRunner.equal(resolve(all).decision, "broke_them_all")
+                TestRunner.equal(resolve(all).outcome, "erased")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_six", "broke_them_all"))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_six", "erased"))
+            end,
+        },
+        {
+            --[[
+                Reading a statue is the one thing in the Crown that costs
+                nothing but time, and the Regent's instruction only ever
+                counts anchors -- so a read wired through the generic
+                wrapper answers exactly like a read that did nothing, and
+                the fight's whole argument becomes a coin flip.
+            ]]
+            name = "reading a statue says what it is, and breaking it is a separate press",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_cinderfall")
+                local regent
+                for _, definition in definitions do
+                    if definition.id == "boss_ash_regent" then
+                        regent = definition
+                    end
+                end
+                local state = regent.module.create("run", "hash", true)
+                state = select(1, regent.module.unlock(state))
+                state = (drive(regent, state, "challenge"))
+                local counting = regent.module.snapshot(state, PLAYER.UserId).instruction
+
+                local real = regent.module.authenticIds(state.phase)[1]
+                local cast
+                for _, statueId in regent.module.StatueIds do
+                    if not regent.module.isAuthentic(state.phase, statueId) then
+                        cast = statueId
+                    end
+                end
+                local _, realRead = drive(regent, state, real)
+                local _, castRead = drive(regent, state, cast)
+                TestRunner.truthy(realRead.message ~= counting, "a read answered with the count")
+                TestRunner.truthy(
+                    realRead.message ~= castRead.message,
+                    "a true face and a cast read the same"
+                )
+
+                -- reading never breaks anything, and every statue's break
+                -- is its own anchor, because breaking a true one is the
+                -- chapter's decision and cannot be undone
+                local looked = (drive(regent, state, real))
+                TestRunner.equal(looked.broken[real], nil)
+                TestRunner.equal(looked.erased, 0)
+                local ids: { [string]: boolean } = {}
+                for _, entry in regent.anchors do
+                    ids[entry.id] = true
+                end
+                for _, statueId in regent.module.StatueIds do
+                    TestRunner.truthy(ids[statueId], statueId .. " cannot be read")
+                    TestRunner.truthy(ids[statueId .. "_break"], statueId .. " cannot be broken")
+                end
+                local smashed = (drive(regent, looked, real .. "_break"))
+                TestRunner.equal(smashed.broken[real], true)
+                TestRunner.equal(smashed.erased, 1)
             end,
         },
     },
