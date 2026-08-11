@@ -68,9 +68,14 @@ local ENTRIES: { [string]: any } = {
     },
     region_cinderfall = {
         builder = CinderfallBuilder,
+        --[[
+            Everything a party needs to walk the Crown is built and its
+            encounters are wired, but it stays shut until somebody has
+            walked it end to end in a live session -- the rule the Delve,
+            the Fen, the Reach and the Vale each cleared before their
+            flags moved. Mesh dressing is an art pass on top of that.
+        ]]
         walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
         missing = {
             "authored mesh dressing",
         },
