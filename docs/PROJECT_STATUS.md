@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-10, at `main` = PR #385, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 168;
+save schema 25, 27 services. Published to Roblox as place version 170;
 #385 leaves Cinderfall shut for the second wave running and names the
 reason precisely — **Play mode is unreachable on this machine, so no
 region's live walk can be started at all** (the recipe and the evidence
@@ -118,7 +118,12 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#385** **The Crown stays shut a second time, and this session can say
+- **#386** (v170) The place-version record for #385. The merged commit `cf55c16`
+  was rebuilt on synchronized `main`, passed 942 Luau tests and every repository
+  validator, and Open Cloud published that artifact to start place
+  `115897110071287` as **place version 170**. No source under `src/` changes
+  here, so the built place is byte-identical to the one #385 produced.
+- **#385** (v170) **The Crown stays shut a second time, and this session can say
   exactly why: there is no Play mode on this machine.** Cinderfall was queued to
   open again and it does not open here either. `Regions.luau`,
   `RegionBuilders.walkable`, the feature flag and its rollout stage are all
