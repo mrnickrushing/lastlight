@@ -150,6 +150,78 @@ failure message. It does not cover Wine itself — the stub never runs a real
 precisely the gap bugs 3 and 4 lived in; whether the server actually launches
 and speaks JSON-RPC still needs the machine Studio runs on.
 
+#### The relay hosts the socket; Studio dials it
+
+This one is worth more than the four above put together, because it makes the
+difference between a session that can see the game and one that cannot, and
+every symptom it produces reads as "Studio is broken".
+
+**Studio is the WebSocket *client*.** Its own log shows the direction plainly:
+
+```console
+[DFLog::WebSocketTraceError] ws: 61 url: http://localhost:13469/studio error: HttpError: ConnectFail
+```
+
+Studio retries that connection every three seconds, forever. `StudioMCP.exe` is
+what *hosts* port 13469. So the relay process has to **outlive individual tool
+calls**: a client that spawns the wrapper per call, or any wrapper that exits
+between calls, tears the host down before Studio finishes dialling it, and every
+call answers `Not connected to the WS host` — which looks exactly like a Studio
+that has not finished loading, and waiting longer never helps. A long-lived MCP
+session is not an optimization here, it is the protocol.
+
+**A latched `start_stop_play` is cleared by restarting the relay, not Studio.**
+The previous handoff recorded that only a Studio restart clears it. It does not:
+killing `StudioMCP.exe` and reconnecting gives a responsive session with Studio
+left alone and its place still loaded, which turns a four-minute recovery into a
+ten-second one.
+
+#### Play mode is unreachable on a Wayland session, and this is why
+
+Measured on 2026-08-10, KDE Plasma on Wayland with a rootless Xwayland
+(`/usr/bin/Xwayland :1 ... -rootless -enable-ei-portal`). **No synthetic input
+reaches Studio by any route**, so the Play button cannot be pressed:
+
+| Route | Result |
+|---|---|
+| `xdotool key --window <wid> F5` (XSendEvent) | ignored |
+| `xdotool key F5` (XTEST) | ignored |
+| A real `/dev/uinput` virtual keyboard | ignored |
+
+The uinput device is genuinely created and seated — it appears in
+`/proc/bus/input/devices` with `Handlers=kbd mouse2 event17` — and it still
+changes nothing. Two independent witnesses confirm the input never reaches the
+compositor's focus chain rather than being dropped by Studio: Studio's own log
+reports `No user input within the last 5000 ms` throughout, and pressing **Meta**
+does not open KDE's launcher either.
+
+**The trap is that the pointer half of XTEST works.** `xdotool mousemove` moves
+the cursor and `getmouselocation` reports the new position, so input looks alive
+while every keystroke and click is going nowhere. Do not take a moving cursor as
+evidence.
+
+The cause is `-enable-ei-portal`: XTEST from X clients is routed through the
+RemoteDesktop portal, and granting that portal needs a dialog that can only be
+clicked by somebody at the machine. So `start_stop_play` never completes (it
+answers `Start play hasn't finished yet` forever) and `F5` never lands.
+
+**What this costs, stated plainly: there is no Play mode, so there is no live
+walk, so no region can have its flag flipped.** A region ships open only in the
+pull request of its own live walk, and that gate cannot be cleared from a session
+in this state. Ask the owner to press Play at the keyboard, or run the session on
+a seat where input is not portal-gated.
+
+**What still works is the entire Edit datamodel**, and it is more than it sounds:
+`execute_luau` against the real place, `screen_capture` from an arbitrary camera
+position, `search_game_tree`, `inspect_instance`. That is enough to build a
+region for real inside Roblox's own VM, drive the pure encounter modules through
+their full state machines against the shared wiring, sweep thousands of
+generation seeds in the engine rather than in Lune, and photograph the result at
+player height in any lighting. It is **not** a walk — no player character, no
+server-validated interaction, no real click — and a session that blurs those two
+is worth less than one that verifies nothing, because the next reader cannot tell
+which it did.
+
 ### 3. Confirm it is actually connected
 
 Open `build/LastLight.rbxlx` in Studio, start a session in the repository root,

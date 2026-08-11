@@ -194,7 +194,29 @@ function RegionEncounterService._unlockWaiting(self: RegionEncounterService)
                 self._logger:info("region_encounter_unlocked", {
                     encounter = live.definition.id,
                 })
-                self:_toast(nil, Strings.get("encounter.something_below_has_stopped_waiting"))
+                --[[
+                    The boss names itself. "SOMETHING BELOW" was written
+                    for the Maw, which is below you, and every region
+                    inherited it -- the Crown's Regent waits above a
+                    party, in its box. The module already knows what to
+                    call itself, so the toast asks it rather than
+                    describing a direction that is only true once.
+                ]]
+                self:_toast(
+                    nil,
+                    string.format(
+                        Strings.get("encounter.something_has_stopped_waiting"),
+                        string.upper(
+                            tostring(
+                                live.definition.module.snapshot(
+                                    nextState,
+                                    0,
+                                    workspace:GetServerTimeNow()
+                                ).displayName
+                            )
+                        )
+                    )
+                )
             end
         end
     end
