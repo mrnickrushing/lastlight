@@ -1362,6 +1362,42 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
     return {}
 end
 
+--[[
+    What the billboard over each anchor says, keyed by anchor id.
+
+    An anchor is named by what it is, which is enough only while no two
+    anchors in a ring are the same thing. The Ash Regent's box is the
+    first that breaks it: reading a statue and breaking it are
+    deliberately separate anchors and they name the same statue, so a
+    ring of ten pillars carried five names twice over -- and one of each
+    pair is a free look while the other is the chapter's irreversible
+    decision. The verb joins the label only where the object alone is
+    ambiguous, so every ring already walked reads exactly as it was
+    walked.
+
+    It lives here rather than in the assembly because the assembly builds
+    Instances and the suite cannot, and "no two anchors in one arena look
+    alike" is the kind of rule that has to be checked rather than
+    remembered.
+]]
+function RegionEncounterWiring.anchorLabels(definition: Definition): { [string]: string }
+    local counts: { [string]: number } = {}
+    for _, meta in definition.anchors do
+        counts[meta.object] = (counts[meta.object] or 0) + 1
+    end
+    local labels: { [string]: string } = {}
+    for _, meta in definition.anchors do
+        labels[meta.id] = if (counts[meta.object] or 0) > 1
+            then string.format(
+                Strings.get("expedition.anchor_label_with_action"),
+                meta.action,
+                meta.object
+            )
+            else meta.object
+    end
+    return labels
+end
+
 -- The anchor id list an arena is built from, in the order the wiring
 -- declares them. RegionBuilders.buildArena spaces them evenly, so order
 -- is placement.

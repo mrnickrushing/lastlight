@@ -43,6 +43,115 @@ return {
     name = "RegionEncounterWiring",
     cases = {
         {
+            --[[
+                An arena names each anchor on a billboard, and two
+                billboards reading the same words are two pillars a party
+                has to tell apart by walking to both. The Regent's box
+                shipped exactly that -- ten anchors, five names, each
+                twice, because reading a statue and breaking it name the
+                same statue -- and it is the worst place in the game for
+                it, since one of each pair is free and the other ends the
+                chapter and cannot be taken back. Held over every wired
+                region, because the rule is about arenas rather than
+                about the Crown.
+            ]]
+            name = "no two anchors in one arena are labelled the same",
+            run = function()
+                for _, regionId in
+                    {
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                        "region_cinderfall",
+                    }
+                do
+                    for _, definition in RegionEncounterWiring.definitionsFor(regionId) do
+                        local labels = RegionEncounterWiring.anchorLabels(definition)
+                        local seen: { [string]: string } = {}
+                        for _, anchor in definition.anchors do
+                            local label = labels[anchor.id]
+                            TestRunner.truthy(
+                                type(label) == "string" and #label > 0,
+                                definition.id .. "/" .. anchor.id .. " has no label"
+                            )
+                            TestRunner.equal(
+                                seen[label],
+                                nil,
+                                definition.id
+                                    .. " labels "
+                                    .. anchor.id
+                                    .. " and "
+                                    .. tostring(seen[label])
+                                    .. " both "
+                                    .. label
+                            )
+                            seen[label] = anchor.id
+                        end
+                    end
+                end
+            end,
+        },
+        {
+            --[[
+                The verb is borrowed only where it is needed. An anchor
+                whose object nothing else in its ring shares keeps exactly
+                the label its region's own live walk signed off, so this
+                cannot quietly relabel arenas a person already looked at.
+
+                Written as a rule rather than as a list of regions because
+                the first draft was a list, and the list was wrong: it
+                assumed only the Regent's box had a collision, and the
+                Titan's tide gates -- EASE and SLAM on one gate, in a
+                region that shipped open after a live walk -- have carried
+                the same one since the Reach opened.
+            ]]
+            name = "the verb joins a label only where the object is ambiguous",
+            run = function()
+                for _, regionId in
+                    {
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                        "region_cinderfall",
+                    }
+                do
+                    for _, definition in RegionEncounterWiring.definitionsFor(regionId) do
+                        local counts: { [string]: number } = {}
+                        for _, anchor in definition.anchors do
+                            counts[anchor.object] = (counts[anchor.object] or 0) + 1
+                        end
+                        local labels = RegionEncounterWiring.anchorLabels(definition)
+                        for _, anchor in definition.anchors do
+                            if counts[anchor.object] == 1 then
+                                TestRunner.equal(
+                                    labels[anchor.id],
+                                    anchor.object,
+                                    definition.id .. "/" .. anchor.id .. " was relabelled"
+                                )
+                            else
+                                TestRunner.truthy(
+                                    string.find(labels[anchor.id], anchor.action, 1, true) ~= nil
+                                        and string.find(
+                                                labels[anchor.id],
+                                                anchor.object,
+                                                1,
+                                                true
+                                            )
+                                            ~= nil,
+                                    definition.id
+                                        .. "/"
+                                        .. anchor.id
+                                        .. " shares an object and does not name its verb"
+                                )
+                            end
+                        end
+                    end
+                end
+            end,
+        },
+        {
             -- Every handler answers an anchor the arena builds, and every
             -- anchor the arena builds has a handler. Either direction
             -- broken is a prompt wired to nothing.

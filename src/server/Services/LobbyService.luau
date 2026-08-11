@@ -18,7 +18,10 @@ local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 
+local RegionAccess =
+    require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").RegionAccess)
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local LobbyService = {}
 LobbyService.__index = LobbyService
@@ -370,7 +373,23 @@ function LobbyService._launch(self: LobbyService, boarding: { Player })
     end
     self._logger:info("lobby_departure_launched", { boarded = #boarding })
     self._analyticsService:lobbyDeparture(nil, "launch", true, nil, #boarding)
-    self:_notify(string.format(Strings.get("toast.the_party_of_n_has_left"), #boarding))
+    --[[
+        The road is pointed at a region by the destination board, and the
+        departure toast used to say EMBERHOLLOW no matter which plank was
+        pressed -- the one line that confirms where a party just went,
+        naming the town it just left. It reads the region the world
+        actually raised, which is the same fact the arrival sign is built
+        from.
+    ]]
+    self:_notify(
+        string.format(
+            Strings.get("toast.the_party_of_n_has_left"),
+            #boarding,
+            RegionExpeditionAssembly.displayName(
+                self._worldService:expeditionRegionId() or RegionAccess.DefaultRegionId
+            )
+        )
+    )
 end
 
 function LobbyService.Start(self: LobbyService)
