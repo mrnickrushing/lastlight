@@ -48,7 +48,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 25, "unexpected save schema version")
-assert(Config.BuildVersion == "0.53.1", "unexpected build version")
+assert(Config.BuildVersion == "0.53.2", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -1725,7 +1725,7 @@ for _, target in blackoutTargets do
     )
 end
 -- The rooted walls are silhouettes. They stand between the road and the relay
--- the player is carrying an 18-second fire to, three pillars with 2-stud gaps
+-- the player is carrying a timed fire to, three pillars with 2-stud gaps
 -- at every one of the three relays, and the chapter's own traversal gate is
 -- that every carry is possible with base movement. Solid, they are a barricade;
 -- queryable, they eat the tap that should reach the relay behind them.

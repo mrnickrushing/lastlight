@@ -2507,6 +2507,16 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 mara = event.failureResolution
             end
         end
+    elseif
+        player:GetAttribute("LastLightLastExpeditionRegion") == "region_bramblewake"
+        and player:GetAttribute("LastLightLastBramblewakeComplete") == false
+    then
+        -- Returning alive is success, but it is not the same success as
+        -- resolving the chapter. The old completed-tutorial line claimed the
+        -- morning was restored after an untouched 0/3 relay.
+        objective = Strings.get("tutorial.bramblewake_still_waits")
+        detail = Strings.get("tutorial.blackout_unfinished_return_when_ready")
+        mara = Strings.get("tutorial.the_wood_is_still_dark_you_made_it_home")
     end
     --[[
         Which clock the HUD pill shows follows the player's own progress and

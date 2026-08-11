@@ -129,6 +129,24 @@ return {
             end,
         },
         {
+            name = "keeps Bramblewake route and interaction clearance fixes wired",
+            run = function()
+                local source = builderSource("src/server/World/BramblewakeBuilder.luau")
+                TestRunner.truthy(
+                    string.find(source, "clearRouteCorridor(expedition", 1, true) ~= nil,
+                    "Bramblewake no longer clears tall collision from connected route seams"
+                )
+                TestRunner.truthy(
+                    string.find(source, "moduleIndex == 3 and slot == 1", 1, true) ~= nil,
+                    "the first farm relay overlaps its harvest interaction again"
+                )
+                TestRunner.truthy(
+                    string.find(source, 'SetAttribute("ClearedRouteObstacleCount"', 1, true) ~= nil,
+                    "route clearance is no longer measurable in Studio"
+                )
+            end,
+        },
+        {
             --[[
                 A region a player can reach has to generate, every time.
 

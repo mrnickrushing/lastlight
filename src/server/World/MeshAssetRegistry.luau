@@ -45,6 +45,33 @@ export type Entry = {
     -- re-sourcing the asset, and it happens once per template rather than
     -- once per placement.
     restyleParts: { { match: { number }, color: { number }?, material: string? } }?,
+    -- Fixed-shape corrections for individual sub-parts of the source model,
+    -- applied once at template load (before scaling/normalization) so every
+    -- placement of the asset gets it, not just the ones that happened to be
+    -- audited. Each fix finds the first BasePart descendant whose Size
+    -- matches `matchSize` (within a small tolerance) and rotates it in
+    -- place about its OWN pivot -- the rest of the model, and the matched
+    -- part's own position, are untouched. Use this only when a part is
+    -- internally inconsistent with the rest of the SAME asset (a signboard
+    -- welded on upside down relative to its own post, a cap authored askew
+    -- relative to the body it sits on); a whole-model problem belongs in
+    -- sourceYawDegrees instead, which this does not replace.
+    partOrientationFixes: {
+        {
+            matchSize: { number },
+            -- Degrees to rotate the matched part about its own local
+            -- X/Y/Z axes (applied as `part.CFrame * CFrame.Angles(...)`,
+            -- so the rotation is local to the part, not the world).
+            localRotationDegrees: { number }?,
+            -- Alternative to localRotationDegrees: copy the orientation of
+            -- another sibling part in the same model, matched by ITS size,
+            -- and keep the target part's own position. Use when the
+            -- correct orientation isn't a clean multiple-of-90 rotation
+            -- away from the broken one, but a sibling part in the same
+            -- asset already has the orientation the target should share.
+            copyOrientationFromSize: { number }?,
+        }
+    }?,
 }
 
 local ENTRIES: { Entry } = {
@@ -367,6 +394,14 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = false,
     },
+    -- The cap/handle MeshPart (0.36 x 0.84 x 1.01) ships welded on at a
+    -- compound tilt (measured up-vector dot with world-up of -0.94, roughly
+    -- 160 degrees from upright) while the body it sits directly on top of
+    -- (1.10 x 1.97 x 1.10) is correctly upright. Every placement of this
+    -- lantern -- there are dozens across Bramblewake alone -- ships with an
+    -- inverted cap. Fixed by copying the body's orientation onto the cap at
+    -- template load; the Roundtable-audit finding this closed is the
+    -- Bramblewake walkthrough of 2026-08-11.
     {
         id = "mesh_creator_kerosene_lantern_a",
         assetId = 11865884168,
@@ -377,6 +412,16 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        partOrientationFixes = {
+            {
+                matchSize = { 0.35983961820602417, 0.8399349451065063, 1.007790446281433 },
+                copyOrientationFromSize = {
+                    1.1010892391204834,
+                    1.9716554880142212,
+                    1.1010887622833252,
+                },
+            },
+        },
     },
     {
         id = "mesh_creator_first_lantern_a",
@@ -453,6 +498,15 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = true,
     },
+    -- The lower signboard Union (2.20 x 0.49 x 0.07) ships rotated 180
+    -- degrees about its own length axis relative to the upper signboard
+    -- Union on the same post (0.07 x 0.49 x 2.20, correctly oriented) --
+    -- both boards' length axes already point the same way in world space,
+    -- only the lower one reads upside down. Confirmed against every
+    -- placement in the Bramblewake stag-tracks event (2026-08-11 walkthrough),
+    -- so this is a template defect, not a per-placement one. Fixed by
+    -- flipping the lower board 180 degrees about its own local X axis
+    -- (its length axis), which does not move it.
     {
         id = "mesh_creator_forest_sign_a",
         assetId = 82202632313902,
@@ -463,6 +517,12 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        partOrientationFixes = {
+            {
+                matchSize = { 2.1965529918670654, 0.4913640022277832, 0.0657959058880806 },
+                localRotationDegrees = { 180, 0, 0 },
+            },
+        },
     },
     {
         id = "mesh_creator_tool_set_a",

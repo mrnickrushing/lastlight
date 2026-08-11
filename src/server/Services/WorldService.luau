@@ -14328,6 +14328,12 @@ function WorldService.blackoutArena(self: WorldService): any
     return self._blackoutArena
 end
 
+function WorldService.blackoutStatus(self: WorldService): string?
+    local world = self._world
+    local status = if world ~= nil then world:GetAttribute("BlackoutStatus") else nil
+    return if type(status) == "string" then status else nil
+end
+
 function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     local arena = self._blackoutArena
     local world = self._world
@@ -14397,7 +14403,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             marker.Size = UDim2.fromOffset(190, 40)
             marker.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
             -- The relay legs are 120, 228, and 161 studs, and the carry timer
-            -- is 18 seconds. At the old MaxDistance of 70 the marker only
+            -- is still deliberately urgent. At the old MaxDistance of 70 the marker only
             -- appeared once a carrier was already most of the way there, so
             -- the one thing that says "this way" could not be seen from where
             -- the fire is taken. 500 covers every leg from anywhere on the

@@ -39,7 +39,12 @@ local function part(
     instance.Anchored = true
     instance.CanCollide = canCollide ~= false
     instance.CanTouch = instance.CanCollide
-    instance.CastShadow = true
+    -- Decorative geometry does not participate in query or shadow work.
+    -- Bramblewake builds hundreds of small fronds, roots, motes, and trim
+    -- pieces; charging every one to the renderer was visible in the live
+    -- walk's 15 FPS and zero-memory-headroom warnings.
+    instance.CanQuery = instance.CanCollide
+    instance.CastShadow = instance.CanCollide
     instance.TopSurface = Enum.SurfaceType.Smooth
     instance.BottomSurface = Enum.SurfaceType.Smooth
     instance.Parent = parent
@@ -152,14 +157,33 @@ local function queueItemAsset(
     })
 end
 
+--[[
+    Height of the RootBridgePlank deck's top surface above a "bridge" visual
+    module's local floor, at a given local Z offset from center. Mirrors the
+    plank placement in the `visual == "bridge"` branch below: index runs
+    -4..4 across Z = index * 4.4, each plank is centered at Y = center.Y + 1
+    + abs(index) * 0.2 with a height of 0.8, so its top sits half that above
+    its own center.
+
+    Anything built at the deck's local X range (center.X + 15..22, where the
+    resource-node and event-socket corners both happen to land) that assumes
+    flat ground needs this instead of a flat 0/0.5, or it sinks into the
+    deck by however far short of it that flat offset falls -- measured at
+    1.4 to 1.8 studs during the Bramblewake walkthrough of 2026-08-11.
+]]
+local function bridgeDeckTopY(localZ: number): number
+    local plankIndex = localZ / 4.4
+    return 1.4 + math.abs(plankIndex) * 0.2
+end
+
 local function fernCluster(
     parent: Instance,
     center: Vector3,
     scale: number,
     ambientSwayTag: string?
 )
-    for blade = 1, 6 do
-        local angle = (blade / 6) * math.pi * 2
+    for blade = 1, 5 do
+        local angle = (blade / 5) * math.pi * 2
         local frond = part(
             parent,
             "BrambleFern",
@@ -673,6 +697,30 @@ local function pathArm(parent: Instance, center: Vector3, neighbor: Vector3)
     end
 end
 
+-- Remove only tall, solid procedural geometry from the twelve-stud-wide seam
+-- between connected cells. Route surfaces stay; trees, posts, walls, and roots
+-- that accidentally land across the road do not. Authored mesh dressing is
+-- already non-colliding and non-querying in MeshTemplateLoader.
+local function clearRouteCorridor(regionModel: Instance, from: Vector3, to: Vector3): number
+    local midpoint = (from + to) / 2
+    local removed = 0
+    for _, descendant in regionModel:GetDescendants() do
+        if
+            descendant:IsA("BasePart")
+            and descendant.CanCollide
+            and descendant.Size.Y > 2.5
+            and descendant.Name ~= "StreamingCellCollision"
+        then
+            local offset = descendant.Position - midpoint
+            if math.abs(offset.X) < 12 and math.abs(offset.Z) < 12 then
+                descendant:Destroy()
+                removed += 1
+            end
+        end
+    end
+    return removed
+end
+
 local function evacuationRoadMarker(
     parent: Instance,
     center: Vector3,
@@ -793,7 +841,7 @@ local function moduleDressing(
         WET_EARTH,
         Enum.Material.Mud
     )
-    for index = 1, math.floor(13 * scale) do
+    for index = 1, math.floor(9 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(12, 31)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
@@ -811,12 +859,12 @@ local function moduleDressing(
             rootTangle(
                 parent,
                 position + Vector3.new(1, 0, -1),
-                random:NextNumber(0.65, 1.1),
+                random:NextNumber(0.65, 1.0),
                 seed + index
             )
         end
     end
-    for index = 1, math.floor(10 * scale) do
+    for index = 1, math.floor(6 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(7, 28)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
@@ -847,7 +895,7 @@ local function moduleDressing(
             parent,
             center + Vector3.new(0, 0, 5),
             FOXFIRE,
-            5,
+            3,
             24,
             seed + 1301,
             runtimeIds.AmbientMoteTag
@@ -1062,6 +1110,17 @@ local function dress(
     yaw: number,
     seed: number
 )
+    -- Hero trees were authored for skyline use. At their original scale they
+    -- filled the third-person camera in four route modules and became
+    -- near-black foreground slabs during the Blackout. Keep the silhouettes,
+    -- while restoring camera and combat sightline space around the road.
+    if
+        assetId == "mesh_conifer_hero_a"
+        or assetId == "mesh_conifer_hero_b"
+        or assetId == "mesh_broadleaf_hero_a"
+    then
+        scale *= 0.82
+    end
     table.insert(extra, {
         assetId = assetId,
         fallbackKind = "asset_dressing",
@@ -1589,6 +1648,18 @@ local function buildModuleVisual(
         end
     elseif visual == "farm" then
         local shell = buildFarm(parent, center)
+        -- One road-facing practical keeps the authored farmhouse doorway,
+        -- wall, and chimney readable instead of a single black silhouette.
+        lantern(parent, center + Vector3.new(11, 0, 15), 0.72, runtimeIds.AmbientLightTag)
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(11, 0, 15),
+            0.82,
+            0,
+            2430
+        )
         return {
             assetId = "mesh_crooked_farmhouse_a",
             fallbackKind = "placeholder",
@@ -1795,9 +1866,19 @@ local function buildModuleVisual(
             0,
             2497
         )
-        local beacon =
-            orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
-        light(beacon, AMBER, 3, 36, true)
+        -- The old six-stud neon sphere swallowed the physical gate in bloom.
+        -- The gate is the destination; this is its restrained hanging light.
+        local beacon = orb(
+            parent,
+            "WayhomeLight",
+            center + Vector3.new(0, 7.2, 0),
+            2.4,
+            AMBER,
+            Enum.Material.Neon
+        )
+        beacon.Transparency = 0.22
+        beacon.CastShadow = false
+        light(beacon, AMBER, 2.1, 24)
         billboard(beacon, Strings.get("bramblewake.wayhome_gate"), CREAM)
         objectIcon(beacon, "wayhome", AMBER)
     end
@@ -2706,13 +2787,22 @@ local function buildEventSocket(
     center: Vector3,
     definition: any,
     runtimeIds: any,
-    extra: { any }
+    extra: { any },
+    isBridge: boolean?
 ): any
+    -- The socket's fixed local corner (X=22, Z=-19) sits inside the
+    -- RootBridgePlank deck's own footprint (X 15.5..22.5, Z spanning every
+    -- plank from -19.85 to 19.85) on "bridge" visual modules. baseY keeps
+    -- everything anchored to this socket -- the socket plate itself, the
+    -- scene dressing, and every interaction step below, all of which are
+    -- offset from `anchor.Position` -- sitting on the deck instead of
+    -- sunk into it.
+    local baseY = if isBridge then bridgeDeckTopY(-19) else 0.5
     local anchor = part(
         parent,
         "EventSocket",
         Vector3.new(7, 1, 7),
-        CFrame.new(center + Vector3.new(22, 0.5, -19)),
+        CFrame.new(center + Vector3.new(22, baseY, -19)),
         Color3.fromRGB(99, 72, 48),
         Enum.Material.WoodPlanks
     )
@@ -2735,7 +2825,7 @@ local function buildEventSocket(
     scene:SetAttribute("VisualKind", definition.visual)
     scene.Parent = parent
 
-    local sceneAt = center + Vector3.new(22, 0, -19)
+    local sceneAt = center + Vector3.new(22, baseY - 0.5, -19)
     if definition.visual == "wagon" then
         -- A wagon that did not make it, and the load it was carrying.
         dress(extra, "mesh_creator_crate_a", parent, sceneAt + Vector3.new(3, 0, 2), 1, 0.6, 2560)
@@ -3312,10 +3402,10 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         it -- density still climbs with distance, just starting politely.
     ]]
     local ranks = {
-        { radius = reach + 36, count = 26, height = 40, width = 5.2, shade = 1.0 },
-        { radius = reach + 124, count = 42, height = 54, width = 6.2, shade = 0.86 },
-        { radius = reach + 232, count = 58, height = 70, width = 7.6, shade = 0.7 },
-        { radius = reach + 350, count = 68, height = 88, width = 9.2, shade = 0.56 },
+        { radius = reach + 48, count = 20, height = 40, width = 5.2, shade = 1.0 },
+        { radius = reach + 136, count = 30, height = 54, width = 6.2, shade = 0.86 },
+        { radius = reach + 244, count = 40, height = 70, width = 7.6, shade = 0.7 },
+        { radius = reach + 362, count = 48, height = 88, width = 9.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
         for index = 1, rank.count do
@@ -3729,7 +3819,7 @@ local function buildBlackoutLayer(
             Three 3.5-stud pillars at 5.5-stud spacing leave 2-stud gaps, and
             they stand 4.5 studs off the relay on the side the road arrives
             from -- so built solid they are a barricade across the one thing
-            the player is running an 18-second carried-fire timer to reach, at
+            the player is running a timed carried-fire route to reach, at
             all three relays. Delivering rootfire only recolored them and left
             them solid, so succeeding changed how they looked without changing
             whether anyone could get past them.
@@ -3838,7 +3928,8 @@ local function buildResourceNodes(
     runtimeIds: any,
     nodes: { any },
     meshPlacements: { any },
-    hostsEliteArena: boolean?
+    hostsEliteArena: boolean?,
+    isBridge: boolean?
 )
     if moduleIndex < 2 then
         return
@@ -3857,7 +3948,16 @@ local function buildResourceNodes(
             overlapping.
         ]]
         local lane = if hostsEliteArena then -(slot - 1.5) else (slot - 1.5)
-        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, lane * 18)
+        -- The first farm harvest node used to sit 3.16 studs from the first
+        -- relay root. Put that one node on the far half of its side lane so
+        -- the prompts, labels, and touch targets no longer occupy one spot.
+        local laneZ = if moduleIndex == 3 and slot == 1 then 9 else lane * 18
+        -- The side == 1 corner (local X = +15..19) sits inside the
+        -- RootBridgePlank deck's footprint (X 15.5..22.5) on "bridge"
+        -- visual modules, so a flat Y = 0 there sinks the node's stump/sap
+        -- mesh into the deck instead of resting on it.
+        local nodeY = if isBridge and side == 1 then bridgeDeckTopY(laneZ) else 0
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), nodeY, laneZ)
         local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
 
         local anchor = part(
@@ -4020,7 +4120,8 @@ function BramblewakeBuilder.build(
             runtimeIds,
             resourceNodes,
             meshPlacements,
-            definition.eliteId ~= nil
+            definition.eliteId ~= nil,
+            definition.visual == "bridge"
         )
         local moduleDressingExtra = {}
         -- The yaw of the road as it reaches this module, taken from the
@@ -4229,7 +4330,8 @@ function BramblewakeBuilder.build(
                 center,
                 generator.eventDefinition(placement.eventId),
                 runtimeIds,
-                meshPlacements
+                meshPlacements,
+                definition.visual == "bridge"
             )
             eventSockets[placement.eventId] = eventResult.socket
             for interactionIndex, interaction in eventResult.interactions do
@@ -4284,6 +4386,16 @@ function BramblewakeBuilder.build(
             arrivalSign:SetAttribute("ArrivalLandmark", true)
         end
     end
+
+    -- Module visuals are authored independently, so clear the connection
+    -- seams only after every module has placed its procedural geometry. This
+    -- closes the Module 2/3 hard stop and the Module 3/4 forced detour found
+    -- by physically walking the route rather than teleporting through it.
+    local clearedRouteObstacles = 0
+    for index = 1, #centers - 1 do
+        clearedRouteObstacles += clearRouteCorridor(expedition, centers[index], centers[index + 1])
+    end
+    expedition:SetAttribute("ClearedRouteObstacleCount", clearedRouteObstacles)
 
     local bossArena = buildWardenSeal(
         expedition,

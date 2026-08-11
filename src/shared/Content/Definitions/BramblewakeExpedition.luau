@@ -962,13 +962,12 @@ return table.freeze({
         instantiated. The test had been comparing built parts against the
         planning budget and failing on the mismatch.
 
-        Derivation of 2600: the preview seed
-        (Config.BramblewakePreviewSeed, which is the only seed the test ever
-        builds) measures 2330 in Studio -- twelve modules plus the regional
-        backdrop, before authored mesh dressing and before the Warden seal
-        annex and Blackout layer, which are built afterwards by their own
-        services and are therefore NOT in this number. 2600 is that measurement
-        plus about 12% headroom.
+        The 2026-08-11 physical walk found the old 2,330-part preview running
+        at roughly 15 FPS with no memory headroom. Purposeful module clusters
+        and the four backdrop ranks were reduced, while route, landmarks, and
+        interaction geometry stayed intact. 2,200 is the tightened regression
+        ceiling for that pass; fresh Studio integration still measures the
+        exact built seed.
 
         What this is: a regression guard. It catches the expedition quietly
         growing a few hundred parts nobody intended.
@@ -981,7 +980,7 @@ return table.freeze({
         than the guard be widened again.
     ]]
     PartBudget = 640,
-    BuiltPartBudget = 2600,
+    BuiltPartBudget = 2200,
     BossArenaPartBudget = 40,
     BlackoutPartBudget = 20,
     LightBudget = 32,

@@ -205,5 +205,19 @@ return {
                 )
             end,
         },
+        {
+            name = "keeps audited Creator Store sub-part orientation fixes",
+            run = function()
+                local lantern = MeshAssetRegistry.get("mesh_creator_kerosene_lantern_a")
+                local sign = MeshAssetRegistry.get("mesh_creator_forest_sign_a")
+                TestRunner.truthy(lantern ~= nil and sign ~= nil)
+                local lanternFixes = (lantern :: MeshAssetRegistry.Entry).partOrientationFixes
+                local signFixes = (sign :: MeshAssetRegistry.Entry).partOrientationFixes
+                TestRunner.truthy(lanternFixes ~= nil and #lanternFixes == 1)
+                TestRunner.truthy(signFixes ~= nil and #signFixes == 1)
+                TestRunner.truthy((lanternFixes :: any)[1].copyOrientationFromSize ~= nil)
+                TestRunner.equal((signFixes :: any)[1].localRotationDegrees[1], 180)
+            end,
+        },
     },
 }

@@ -27,7 +27,7 @@ The increment includes:
 
 - stable `blackout_bramblewake` state and a feature kill switch;
 - a four-stage relay → Old Growth → Warden → resolution contract;
-- an 18-second carried-rootfire window with three distinct stable relay IDs;
+- a 30-second carried-rootfire window with three distinct stable relay IDs;
 - chaining fire from any lit living root so every route remains traversable;
 - rooted-wall world silhouettes, written labels, a Blackout lighting layer, and
   low-cost anchored geometry;
@@ -79,7 +79,7 @@ roots are placed at stable route positions:
 | `blackout_root_mill` | Mill Root | middle relay |
 | `blackout_root_cathedral` | Cathedral Root | final relay |
 
-Taking rootfire starts an 18-second server timestamp. Delivering to an unlit root
+Taking rootfire starts a 30-second server timestamp. Delivering to an unlit root
 consumes that carried fire and permanently lights the root for the server run.
 An already-lit root becomes the next fire source, creating a readable chain
 instead of requiring an impossible sprint back to expedition entry. Repeated
@@ -177,7 +177,7 @@ ColorCorrection effect. All geometry is anchored.
    to show `ROOTFIRE RELAY · 0/3` without covering the objective or controls.
 5. Approach Old Growth before finishing the relay. Require no elite activation,
    prompt, attack, health rail, or damage.
-6. Take rootfire at entry. Require a written 18-second countdown, carried light,
+6. Take rootfire at entry. Require a written 30-second countdown, carried light,
    and no progress until an unlit relay receives the fire.
 7. Deliver to the Farm Root, take fire back from that lit root, then repeat for
    Mill and Cathedral. Require exactly `1/3`, `2/3`, `3/3`; duplicate delivery
