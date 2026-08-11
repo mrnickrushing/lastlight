@@ -72955,8 +72955,43 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         parent = interactables,
         fallbackInstance = archiveFallback,
     })
+    --[[
+        A dedicated anchor for the prompt, not the board itself.
+
+        `_registerInteraction` parents the ProximityPrompt and a
+        ClickDetector directly onto whatever target it is given, and
+        `hideProceduralPlaceholder`'s whole reason for existing is to leave
+        anything carrying a live prompt alone -- "a part that exists to be
+        clicked keeps its queries" is correct for a pedestal that is never
+        replaced. `GreenwardArchive` is also this fallback's mesh-swap
+        placeholder, though: `mesh_creator_notice_board_a` above is queued
+        to replace it, and once that authored mesh loads the fallback is
+        supposed to disappear the same way every other replaced prop does.
+        Registering straight onto the board meant it never could -- a bark
+        colored slab a third the width of the plaza stayed lit and opaque
+        forever, sitting in the same space as the nicer authored board
+        loading in behind it. Measured live: the two combined read as a
+        single flat black panel, because BARK is dark enough that a
+        6-by-9 slab of it under a shading roof looks like a returned void.
+
+        The anchor is invisible and carries no interaction of its own
+        significance -- it exists only so the prompt has somewhere to live
+        that `hideProceduralPlaceholder` is free to hide along with
+        everything else once the authored board is up.
+    ]]
+    local archiveInteractionAnchor = part(
+        archiveFallback,
+        "GreenwardArchiveInteractionAnchor",
+        archive.Size,
+        archive.CFrame,
+        BARK,
+        Enum.Material.WoodPlanks
+    )
+    archiveInteractionAnchor.Transparency = 1
+    archiveInteractionAnchor.CanCollide = false
+    archiveInteractionAnchor.CastShadow = false
     self:_registerInteraction(
-        archive,
+        archiveInteractionAnchor,
         self._runtimeIds.InteractionIds.QuestBoard,
         self._runtimeIds.Actions.OpenFieldBook,
         Strings.get("world.open"),
