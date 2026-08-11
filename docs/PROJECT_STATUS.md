@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = `7c06607` (PR #390), build `0.53.2`,
-save schema 25, 27 services. The last published artifact remains Roblox place
-version 171 from `5b7d4dd`; PRs #383 and #390 have not been published yet.
+Last updated: 2026-08-11, at `main` = `b0d93cf` (PR #391), build `0.53.2`,
+save schema 25, 27 services. Published to Roblox as place version 172 from
+`b0d93cf`; this release includes PRs #383 and #390.
 **#387 leaves Cinderfall shut for the third wave running, and closes the
 last route anybody had left to try.** Play mode is unreachable on this
 machine, and the two things that looked like ways around it are now
@@ -126,7 +126,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#390** **The Module 1-2 placement follow-up removes the defects that survived
+- **#390** (v172) **The Module 1-2 placement follow-up removes the defects that survived
   #388's wider Bramblewake repair.** The arrival arch and both lanterns now
   treat their procedural constructions as replacement fallbacks, so successful
   authored meshes no longer double-render over them while their invisible
@@ -140,6 +140,10 @@ Newest first since the last header:
   verification both pass. The latest place was opened from the terminal in
   Studio, but the managed MCP transport was reset during the required Wine
   teardown; do not claim a post-fix Play walk until a fresh MCP client attaches.
+  Synchronized `main` at `b0d93cf` passed the complete suite again, including
+  **944 Luau tests**, then Open Cloud published its freshly regenerated artifact
+  (`0b737699a496d5415a9f4d016edcaf881ad28e8d165003571ec3a9a376b7d4ba`) to
+  start place `115897110071287` as **place version 172**.
 - **#388** (v171) **The complete physical
   Bramblewake walk found route, readability, feedback and performance defects,
   and build `0.53.2` repairs them as one coherent pass.** The source clears tall

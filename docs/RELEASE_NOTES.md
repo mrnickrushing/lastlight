@@ -10,12 +10,16 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-386 merged pull requests. The version column is blank where the
+390 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #391 | 2026-08-11 |  | Record Bramblewake module merge |
+| #390 | 2026-08-11 | v172 | Clear the first two Bramblewake modules |
+| #383 | 2026-08-11 |  | Stop the Field Book's fallback board from staying visible forever |
+| #389 | 2026-08-11 |  | Record Roblox place version 171 |
 | #388 | 2026-08-11 | v171 | Repair the full Bramblewake walkthrough |
 | #387 | 2026-08-10 |  | Prove there is no second door into Play, and find the finale has no runtime |
 | #386 | 2026-08-10 | v170 | Record Roblox place version 170 |
