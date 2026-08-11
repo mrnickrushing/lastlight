@@ -173,6 +173,48 @@ return {
             end,
         },
         {
+            name = "keeps Bramblewake authored placement replacements uncluttered",
+            run = function()
+                local source = builderSource("src/server/World/BramblewakeBuilder.luau")
+                local worldService = builderSource("src/server/Services/WorldService.luau")
+                TestRunner.truthy(
+                    string.find(source, "local function blocksRoute(angle: number)", 1, true) ~= nil
+                        and string.find(source, "exitFacing", 1, true) ~= nil,
+                    "the briar ring no longer reserves both its entrance and exit gaps"
+                )
+                TestRunner.truthy(
+                    string.find(source, "spine.Transparency = 1", 1, true) ~= nil
+                        and string.find(source, "spine.CanQuery = false", 1, true) ~= nil,
+                    "primitive briar collision again reads as visible authored clutter"
+                )
+                local briarRingChunk =
+                    string.match(source, 'visual == "briar_ring"(.-)elseif visual == "sapfall"')
+                TestRunner.truthy(briarRingChunk ~= nil, "the briar ring visual went missing")
+                TestRunner.equal(
+                    string.find(briarRingChunk :: string, '"mesh_deadfall_a"', 1, true),
+                    nil,
+                    "oversized deadfall dressing again clutters the briar ring"
+                )
+                TestRunner.truthy(
+                    string.find(source, "HungryHomesteadFallbackShell", 1, true) ~= nil
+                        and string.find(source, "HungryHomesteadLanternFallback", 1, true)
+                            ~= nil,
+                    "the homestead lost its replaceable shell or restrained practical light"
+                )
+                TestRunner.equal(
+                    string.find(source, '"HomesteadSupplyCrate"', 1, true),
+                    nil,
+                    "the homestead again stacks primitive supply blocks over authored props"
+                )
+                TestRunner.truthy(
+                    string.find(worldService, "local isInteractionTarget", 1, true) ~= nil
+                        and string.find(worldService, "instance.Transparency = 1", 1, true)
+                            ~= nil,
+                    "authored interaction props no longer hide their visible primitive targets"
+                )
+            end,
+        },
+        {
             --[[
                 A region a player can reach has to generate, every time.
 

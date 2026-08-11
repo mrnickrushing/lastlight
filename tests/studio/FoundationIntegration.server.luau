@@ -1800,6 +1800,13 @@ for _, target in eventSteps do
         prompt:GetAttribute("ActionId") == RuntimeIds.Actions.ExpeditionEvent,
         "event prompt does not route to the server event action"
     )
+    if target:GetAttribute("ReplacedByAuthoredMesh") == true then
+        assert(
+            target.Transparency == 1,
+            "an authored event prop still has its primitive target visibly stacked over it"
+        )
+        assert(target.CanQuery, "a hidden event target must remain queryable for interaction")
+    end
 end
 for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
     assert(socket:GetAttribute("Status") == "dormant", "event must begin dormant")
@@ -1818,6 +1825,26 @@ for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
         type(scene:GetAttribute("VisualKind")) == "string"
             and (tonumber(scene:GetAttribute("PhysicalPartCount")) or 0) >= 4,
         "event scene needs a distinct visual kind and enough physical construction"
+    )
+end
+local homesteadShell = expedition:FindFirstChild("HungryHomesteadFallbackShell", true)
+if homesteadShell ~= nil then
+    assert(homesteadShell:IsA("Model"), "homestead fallback shell must be a replaceable model")
+    assert(
+        homesteadShell:FindFirstChild("HomesteadRoof") ~= nil
+            and homesteadShell:FindFirstChild("HomesteadBackWall") ~= nil,
+        "the authored farmhouse needs one complete fallback shell"
+    )
+    assert(
+        expedition:FindFirstChild("HomesteadSupplyCrate", true) == nil,
+        "plain supply blocks cannot stack over the homestead's authored crate and barrel"
+    )
+    local flame = expedition:FindFirstChild("HomesteadLanternFlame", true)
+    assert(flame ~= nil and flame:IsA("BasePart"), "the dark homestead needs one practical light")
+    local practical = flame:FindFirstChildOfClass("PointLight")
+    assert(
+        practical ~= nil and practical.Range >= 12 and practical.Brightness <= 1,
+        "homestead practical must be readable but restrained"
     )
 end
 local eliteTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionEliteTag)

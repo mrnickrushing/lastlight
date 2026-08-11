@@ -729,7 +729,11 @@ local function evacuationRoadMarker(
 )
     local direction = (neighbor - center).Unit
     local side = Vector3.new(-direction.Z, 0, direction.X)
-    local base = center + direction * 13 + side * 9
+    -- The resource lane can share the same forward offset. Fifteen studs to
+    -- the outside keeps the sign's full frame and camera sightline clear of
+    -- the seven-stud Heartwood/Amber mesh instead of putting the node in
+    -- front of EVACUATION on every odd-numbered turn module.
+    local base = center + direction * 13 + side * 15
     local lean = if sequenceIndex % 4 == 1 then math.rad(-4) else math.rad(4)
     local sign = WorldSignBuilder.createDirectionSign(
         parent,
@@ -1572,7 +1576,8 @@ local function buildModuleVisual(
     center: Vector3,
     runtimeIds: any,
     extra: { any },
-    facing: number
+    facing: number,
+    exitFacing: number?
 ): any?
     if visual == "lantern_gate" then
         local archFallback = Instance.new("Model")
@@ -1706,41 +1711,68 @@ local function buildModuleVisual(
             fallbackInstance = shell,
         }
     elseif visual == "briar_ring" then
+        --[[
+            The ring is scenery around a route, not a wall the route phases
+            through. `facing` points along the incoming road into the cell,
+            so its opposite points from the ring centre back toward the
+            entrance. `exitFacing` points toward the next cell. Reserve a
+            camera-width opening around both directions before placing any
+            authored wall or collision spine.
+
+            A 0.9 dot threshold is roughly 26 degrees. At this ring's
+            25-stud radius that clears more than the eight-stud half-width of
+            the road, including the third-person camera over the shoulder.
+        ]]
+        local entranceDirection = Vector3.new(-math.sin(facing), 0, -math.cos(facing))
+        local exitDirection = if exitFacing ~= nil
+            then Vector3.new(math.sin(exitFacing), 0, math.cos(exitFacing))
+            else nil
+        local function blocksRoute(angle: number): boolean
+            local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+            if radial:Dot(entranceDirection) > 0.9 then
+                return true
+            end
+            return exitDirection ~= nil and radial:Dot(exitDirection) > 0.9
+        end
+
         for index = 1, 10 do
             local angle = (index / 10) * math.pi * 2 + math.pi / 10
-            dress(
-                extra,
-                "mesh_briar_wall_a",
-                parent,
-                center + Vector3.new(math.cos(angle) * 25, 0, math.sin(angle) * 25),
-                1.1,
-                -angle + math.pi / 2,
-                2480 + index
-            )
+            if not blocksRoute(angle) then
+                dress(
+                    extra,
+                    "mesh_briar_wall_a",
+                    parent,
+                    center + Vector3.new(math.cos(angle) * 25, 0, math.sin(angle) * 25),
+                    1.1,
+                    -angle + math.pi / 2,
+                    2480 + index
+                )
+            end
         end
-        for index = 1, 6 do
-            local angle = (index / 6) * math.pi * 2
-            dress(
-                extra,
-                "mesh_deadfall_a",
-                parent,
-                center + Vector3.new(math.cos(angle) * 25, 0, math.sin(angle) * 25),
-                1.1,
-                -angle,
-                2440 + index
-            )
-        end
+
+        -- Deadfall meshes are intentionally absent here. Their long trunks
+        -- stand upright after the registry's reviewed rotation and read as a
+        -- second, cluttered wall when mixed into this circular silhouette.
+        -- Other modules still use them where one fallen tree has room to read.
         for index = 1, 8 do
             local angle = (index / 8) * math.pi * 2 + math.pi / 8
-            part(
-                parent,
-                "BriarSpine",
-                Vector3.new(1.4, 10, 1.4),
-                CFrame.new(center + Vector3.new(math.cos(angle) * 25, 4, math.sin(angle) * 25))
-                    * CFrame.Angles(math.rad(18), 0, -angle),
-                DARK_BARK,
-                Enum.Material.Wood
-            )
+            if not blocksRoute(angle) then
+                local spine = part(
+                    parent,
+                    "BriarSpine",
+                    Vector3.new(1.4, 10, 1.4),
+                    CFrame.new(center + Vector3.new(math.cos(angle) * 25, 4, math.sin(angle) * 25))
+                        * CFrame.Angles(math.rad(18), 0, -angle),
+                    DARK_BARK,
+                    Enum.Material.Wood
+                )
+                -- Authored walls own the silhouette. These simple posts are
+                -- stable collision only and must not read as giant beams
+                -- crossing the ring.
+                spine.Transparency = 1
+                spine.CastShadow = false
+                spine.CanQuery = false
+            end
         end
     elseif visual == "sapfall" then
         for index = -2, 2 do
@@ -3003,6 +3035,9 @@ local function buildEventSocket(
             mote.CanQuery = false
         end
     elseif definition.visual == "hungry_homestead" then
+        local homesteadShell = Instance.new("Model")
+        homesteadShell.Name = "HungryHomesteadFallbackShell"
+        homesteadShell.Parent = scene
         dress(
             extra,
             "mesh_crooked_farmhouse_a",
@@ -3010,16 +3045,16 @@ local function buildEventSocket(
             sceneAt + Vector3.new(0, 0, -5),
             0.9,
             0.8,
-            2580
+            2580,
+            homesteadShell
         )
-        dress(extra, "mesh_creator_barrel_a", parent, sceneAt + Vector3.new(5, 0, 2), 1, 0.3, 2581)
         dress(
             extra,
             "mesh_creator_rustic_fence_a",
             parent,
-            sceneAt + Vector3.new(-7, 0, 3),
+            sceneAt + Vector3.new(-12, 0, 8),
             1,
-            0,
+            0.3,
             2582
         )
         part(
@@ -3032,7 +3067,7 @@ local function buildEventSocket(
         )
         for side = -1, 1, 2 do
             part(
-                scene,
+                homesteadShell,
                 "HomesteadPost",
                 Vector3.new(0.7, 7, 0.7),
                 CFrame.new(anchor.Position + Vector3.new(side * 7, 3.5, -3)),
@@ -3041,7 +3076,7 @@ local function buildEventSocket(
             )
         end
         part(
-            scene,
+            homesteadShell,
             "HomesteadRoof",
             Vector3.new(18, 0.7, 11),
             CFrame.new(anchor.Position + Vector3.new(0, 7.2, 1)) * CFrame.Angles(0, 0, math.rad(3)),
@@ -3049,7 +3084,7 @@ local function buildEventSocket(
             Enum.Material.Slate
         )
         part(
-            scene,
+            homesteadShell,
             "HomesteadBackWall",
             Vector3.new(15.5, 6.8, 0.7),
             CFrame.new(anchor.Position + Vector3.new(0, 3.4, 5)),
@@ -3058,30 +3093,77 @@ local function buildEventSocket(
         )
         for side = -1, 1, 2 do
             part(
-                scene,
+                homesteadShell,
                 "HomesteadSideWall",
                 Vector3.new(0.7, 6.8, 8.5),
                 CFrame.new(anchor.Position + Vector3.new(side * 7.5, 3.4, 1)),
                 Color3.fromRGB(77, 55, 40),
                 Enum.Material.WoodPlanks
             )
-            part(
-                scene,
-                "HomesteadSupplyCrate",
-                Vector3.new(2.8, 2.4, 2.7),
-                CFrame.new(anchor.Position + Vector3.new(side * 4.9, 1.55, 3.1)),
-                Color3.fromRGB(96, 67, 43),
-                Enum.Material.WoodPlanks,
-                false
-            )
         end
-        part(
+        local tableTop = part(
             scene,
             "HomesteadTable",
             Vector3.new(5.8, 0.55, 2.8),
             CFrame.new(anchor.Position + Vector3.new(0, 2.7, 3)),
             Color3.fromRGB(91, 63, 43),
             Enum.Material.WoodPlanks
+        )
+
+        -- A single warm practical keeps all three stores readable without
+        -- adding another glowing route marker. The small flame survives the
+        -- authored-mesh replacement and becomes the light inside the real
+        -- kerosene lantern; the scratch frame is hidden with the farmhouse's
+        -- other replacement geometry when its own mesh resolves.
+        local lanternBottom = tableTop.Position + Vector3.new(0, tableTop.Size.Y * 0.5, 0)
+        local lanternFallback = Instance.new("Model")
+        lanternFallback.Name = "HungryHomesteadLanternFallback"
+        lanternFallback.Parent = scene
+        local lanternBase = part(
+            lanternFallback,
+            "HomesteadLanternBase",
+            Vector3.new(0.22, 0.85, 0.85),
+            CFrame.new(lanternBottom + Vector3.new(0, 0.11, 0)),
+            Color3.fromRGB(58, 56, 52),
+            Enum.Material.Metal,
+            false
+        )
+        lanternBase.Shape = Enum.PartType.Cylinder
+        lanternBase.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+        local lanternGlass = part(
+            lanternFallback,
+            "HomesteadLanternGlass",
+            Vector3.new(0.65, 1.05, 0.65),
+            CFrame.new(lanternBottom + Vector3.new(0, 0.78, 0)),
+            Color3.fromRGB(255, 190, 92),
+            Enum.Material.Glass,
+            false
+        )
+        lanternGlass.Transparency = 0.18
+        lanternGlass.CastShadow = false
+        lanternGlass.CanQuery = false
+        local lanternFlame = orb(
+            lanternFallback,
+            "HomesteadLanternFlame",
+            lanternBottom + Vector3.new(0, 0.78, 0),
+            0.3,
+            AMBER,
+            Enum.Material.Neon
+        )
+        lanternFlame:SetAttribute("KeepVisibleOnReplacement", true)
+        lanternFlame.CanQuery = false
+        lanternFlame.CastShadow = false
+        light(lanternFlame, AMBER, 0.9, 13)
+        CollectionService:AddTag(lanternFlame, runtimeIds.AmbientLightTag)
+        dress(
+            extra,
+            "mesh_creator_kerosene_lantern_a",
+            parent,
+            lanternBottom,
+            0.8,
+            0,
+            2583,
+            lanternFallback
         )
     elseif definition.visual == "stag_tracks" then
         dress(extra, "mesh_deadfall_a", parent, sceneAt + Vector3.new(6, 0, -4), 1.1, 2.9, 2590)
@@ -4166,13 +4248,18 @@ function BramblewakeBuilder.build(
             elseif ahead ~= nil then ahead - center
             else Vector3.new(0, 0, 1)
         local facing = if along.Magnitude > 0.01 then math.atan2(along.X, along.Z) else 0
+        local exitAlong = if ahead ~= nil then ahead - center else nil
+        local exitFacing = if exitAlong ~= nil and exitAlong.Magnitude > 0.01
+            then math.atan2(exitAlong.X, exitAlong.Z)
+            else nil
         local meshPlacement = buildModuleVisual(
             module,
             definition.visual,
             center,
             runtimeIds,
             moduleDressingExtra,
-            facing
+            facing,
+            exitFacing
         )
         if meshPlacement ~= nil then
             table.insert(meshPlacements, meshPlacement)
