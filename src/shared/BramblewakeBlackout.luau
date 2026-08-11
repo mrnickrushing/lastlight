@@ -72,7 +72,10 @@ local STAGE_LABEL = table.freeze({
 BramblewakeBlackout.Id = "blackout_bramblewake"
 BramblewakeBlackout.RelayNodeIds = RELAY_NODE_IDS
 BramblewakeBlackout.DecisionIds = DECISION_IDS
-BramblewakeBlackout.FireCarrySeconds = 18
+-- The longest live first-leg walk is about 171 studs and includes a module
+-- seam. Eighteen seconds expired during legitimate sprint-and-jump traversal;
+-- thirty leaves recovery room without removing the relay's urgency.
+BramblewakeBlackout.FireCarrySeconds = 30
 BramblewakeBlackout.StageCount = 4
 
 local function participantKey(userId: number): string

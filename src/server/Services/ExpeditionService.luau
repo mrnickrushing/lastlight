@@ -852,9 +852,19 @@ end
 
 function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
     self._worldService:clearRecoveryCache(player)
-    return self._worldService:exitBramblewake(player, function()
+    local exited = self._worldService:exitBramblewake(player, function()
         self:_deliverPendingPayoff(player)
     end)
+    if exited then
+        player:SetAttribute("LastLightLastExpeditionRegion", self._regionId)
+        if self._regionId == "region_bramblewake" then
+            player:SetAttribute(
+                "LastLightLastBramblewakeComplete",
+                self._worldService:blackoutStatus() == "complete"
+            )
+        end
+    end
+    return exited
 end
 
 function ExpeditionService.extract(self: ExpeditionService, player: Player): any

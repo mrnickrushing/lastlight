@@ -4420,6 +4420,10 @@ end
 
 function HUDController._layout(self: HUDController)
     local viewport, scale, canvasWidth, _canvasHeight = canvasMetrics()
+    local blackout = if self._currentState ~= nil then self._currentState.blackout else nil
+    local blackoutActive = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
     --[[
         Treat any touch device, and any short viewport, as the touch layout.
 
@@ -4452,9 +4456,13 @@ function HUDController._layout(self: HUDController)
         -- objective text cannot run past the right edge on a small screen.
         local cardWidth = math.max(260, math.min(470, canvasWidth - 36))
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
+        -- The Blackout rail already carries stage and progress. While it is
+        -- present, keep the objective card to its trail/title pair instead of
+        -- stacking the same instruction twice over world prompts.
+        local compactObjective = self._compactEnabled or blackoutActive
         self._objectiveFrame.Size =
-            UDim2.fromOffset(cardWidth, if self._compactEnabled then 78 else 112)
-        self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
+            UDim2.fromOffset(cardWidth, if compactObjective then 78 else 112)
+        self._resource.Position = UDim2.fromOffset(18, if compactObjective then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         --[[
@@ -4471,8 +4479,8 @@ function HUDController._layout(self: HUDController)
         -- Tucked under the objective panel on the left rather than spanning
         -- the screen at eye level. At full width it sat straight across the
         -- middle of the view for the whole nine minutes of a Blackout.
-        self._blackoutFrame.Position = UDim2.fromOffset(18, 196)
-        self._blackoutFrame.Size = UDim2.fromOffset(cardWidth, 70)
+        self._blackoutFrame.Position = UDim2.fromOffset(18, 156)
+        self._blackoutFrame.Size = UDim2.fromOffset(cardWidth, 58)
         self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
             UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 222 else 150)
@@ -4819,6 +4827,13 @@ function HUDController._updateClock(self: HUDController)
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
+            elseif blackout.overtime then
+                self._blackoutDetail.Text = string.format(
+                    Strings.get("hud.overtime_relay_active_take_rootfire_n_n_n"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
             else
                 self._blackoutDetail.Text = string.format(
                     Strings.get("hud.take_rootfire_n_n_n"),
@@ -5026,6 +5041,10 @@ function HUDController.update(self: HUDController, state: any)
     self._mara.Visible = departedWorld
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
+    -- The Blackout rail carries the same next-step detail in a smaller,
+    -- time-aware form. Hiding this duplicate line on touch-height screens
+    -- preserves the world prompt and route beneath the upper-left cards.
+    self._detail.Visible = not self._compactEnabled and not blackoutActive
     self._progress.Text = string.format(
         "%s · %d / %d",
         tostring(state.trailName or Strings.get("hud.first_light")),

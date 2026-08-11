@@ -29,7 +29,10 @@
 set -uo pipefail
 
 wrapper="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/studio-mcp-wrapper.sh"
-root="$(mktemp -d)"
+# Some desktop sandboxes expose TMPDIR on a noexec mount. The fixtures include
+# executable Wine stubs, so keep them beside the checkout unless explicitly
+# directed to another executable location.
+root="$(mktemp -d "${STUDIO_MCP_TEST_TMPDIR:-$PWD}/.studio-mcp-test.XXXXXX")"
 trap 'rm -rf "$root"' EXIT
 
 passed=0

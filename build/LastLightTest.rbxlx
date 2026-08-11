@@ -3311,7 +3311,10 @@ local STAGE_LABEL = table.freeze({
 BramblewakeBlackout.Id = "blackout_bramblewake"
 BramblewakeBlackout.RelayNodeIds = RELAY_NODE_IDS
 BramblewakeBlackout.DecisionIds = DECISION_IDS
-BramblewakeBlackout.FireCarrySeconds = 18
+-- The longest live first-leg walk is about 171 studs and includes a module
+-- seam. Eighteen seconds expired during legitimate sprint-and-jump traversal;
+-- thirty leaves recovery room without removing the relay's urgency.
+BramblewakeBlackout.FireCarrySeconds = 30
 BramblewakeBlackout.StageCount = 4
 
 local function participantKey(userId: number): string
@@ -4906,7 +4909,7 @@ return table.freeze(CompanionMotion)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.53.1",
+    BuildVersion = "0.53.2",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -6769,13 +6772,12 @@ return table.freeze({
         instantiated. The test had been comparing built parts against the
         planning budget and failing on the mismatch.
 
-        Derivation of 2600: the preview seed
-        (Config.BramblewakePreviewSeed, which is the only seed the test ever
-        builds) measures 2330 in Studio -- twelve modules plus the regional
-        backdrop, before authored mesh dressing and before the Warden seal
-        annex and Blackout layer, which are built afterwards by their own
-        services and are therefore NOT in this number. 2600 is that measurement
-        plus about 12% headroom.
+        The 2026-08-11 physical walk found the old 2,330-part preview running
+        at roughly 15 FPS with no memory headroom. Purposeful module clusters
+        and the four backdrop ranks were reduced, while route, landmarks, and
+        interaction geometry stayed intact. 2,200 is the tightened regression
+        ceiling for that pass; fresh Studio integration still measures the
+        exact built seed.
 
         What this is: a regression guard. It catches the expedition quietly
         growing a few hundred parts nobody intended.
@@ -6788,7 +6790,7 @@ return table.freeze({
         than the guard be widened again.
     ]]
     PartBudget = 640,
-    BuiltPartBudget = 2600,
+    BuiltPartBudget = 2200,
     BossArenaPartBudget = 40,
     BlackoutPartBudget = 20,
     LightBudget = 32,
@@ -36991,10 +36993,14 @@ local SOURCE: { [string]: string } = {
     ["hud.carry_rootfire_ns_n_n_n"] = "CARRY ROOTFIRE %.1fs → %s · %d/%d",
     ["hud.next_root"] = "NEXT ROOT",
     ["hud.take_rootfire_n_n_n"] = "TAKE ROOTFIRE → %s · %d/%d",
+    ["hud.overtime_relay_active_take_rootfire_n_n_n"] = "OVERTIME — RELAY ACTIVE · TAKE ROOTFIRE → %s · %d/%d",
     ["hud.rooted_walls_cleanse_old_growth"] = "ROOTED WALLS · CLEANSE OLD GROWTH",
     ["hud.warden_s_seal_cleanse_or_break"] = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS",
     ["hud.vote_farmland_wild_shared_agroforest"] = "VOTE: FARMLAND · WILD · SHARED AGROFOREST",
     ["hud.vote_recorded_waiting_for_active_travelers"] = "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS",
+    ["tutorial.bramblewake_still_waits"] = "BRAMBLEWAKE STILL WAITS",
+    ["tutorial.blackout_unfinished_return_when_ready"] = "Blackout unfinished · return when you are ready to continue.",
+    ["tutorial.the_wood_is_still_dark_you_made_it_home"] = "The wood is still dark. You made it home — catch your breath, then we go back.",
     ["hud.warden_stag"] = "WARDEN STAG",
     ["common.old_growth"] = "OLD GROWTH",
     ["hud.cleansed_continue_to_wayhome"] = "CLEANSED · CONTINUE TO WAYHOME",
@@ -51732,9 +51738,19 @@ end
 
 function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
     self._worldService:clearRecoveryCache(player)
-    return self._worldService:exitBramblewake(player, function()
+    local exited = self._worldService:exitBramblewake(player, function()
         self:_deliverPendingPayoff(player)
     end)
+    if exited then
+        player:SetAttribute("LastLightLastExpeditionRegion", self._regionId)
+        if self._regionId == "region_bramblewake" then
+            player:SetAttribute(
+                "LastLightLastBramblewakeComplete",
+                self._worldService:blackoutStatus() == "complete"
+            )
+        end
+    end
+    return exited
 end
 
 function ExpeditionService.extract(self: ExpeditionService, player: Player): any
@@ -64904,6 +64920,16 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 mara = event.failureResolution
             end
         end
+    elseif
+        player:GetAttribute("LastLightLastExpeditionRegion") == "region_bramblewake"
+        and player:GetAttribute("LastLightLastBramblewakeComplete") == false
+    then
+        -- Returning alive is success, but it is not the same success as
+        -- resolving the chapter. The old completed-tutorial line claimed the
+        -- morning was restored after an untouched 0/3 relay.
+        objective = Strings.get("tutorial.bramblewake_still_waits")
+        detail = Strings.get("tutorial.blackout_unfinished_return_when_ready")
+        mara = Strings.get("tutorial.the_wood_is_still_dark_you_made_it_home")
     end
     --[[
         Which clock the HUD pill shows follows the player's own progress and
@@ -80437,6 +80463,12 @@ function WorldService.blackoutArena(self: WorldService): any
     return self._blackoutArena
 end
 
+function WorldService.blackoutStatus(self: WorldService): string?
+    local world = self._world
+    local status = if world ~= nil then world:GetAttribute("BlackoutStatus") else nil
+    return if type(status) == "string" then status else nil
+end
+
 function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     local arena = self._blackoutArena
     local world = self._world
@@ -80506,7 +80538,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             marker.Size = UDim2.fromOffset(190, 40)
             marker.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
             -- The relay legs are 120, 228, and 161 studs, and the carry timer
-            -- is 18 seconds. At the old MaxDistance of 70 the marker only
+            -- is still deliberately urgent. At the old MaxDistance of 70 the marker only
             -- appeared once a carrier was already most of the way there, so
             -- the one thing that says "this way" could not be seen from where
             -- the fire is taken. 500 covers every leg from anywhere on the
@@ -81984,7 +82016,12 @@ local function part(
     instance.Anchored = true
     instance.CanCollide = canCollide ~= false
     instance.CanTouch = instance.CanCollide
-    instance.CastShadow = true
+    -- Decorative geometry does not participate in query or shadow work.
+    -- Bramblewake builds hundreds of small fronds, roots, motes, and trim
+    -- pieces; charging every one to the renderer was visible in the live
+    -- walk's 15 FPS and zero-memory-headroom warnings.
+    instance.CanQuery = instance.CanCollide
+    instance.CastShadow = instance.CanCollide
     instance.TopSurface = Enum.SurfaceType.Smooth
     instance.BottomSurface = Enum.SurfaceType.Smooth
     instance.Parent = parent
@@ -82097,14 +82134,33 @@ local function queueItemAsset(
     })
 end
 
+--[[
+    Height of the RootBridgePlank deck's top surface above a "bridge" visual
+    module's local floor, at a given local Z offset from center. Mirrors the
+    plank placement in the `visual == "bridge"` branch below: index runs
+    -4..4 across Z = index * 4.4, each plank is centered at Y = center.Y + 1
+    + abs(index) * 0.2 with a height of 0.8, so its top sits half that above
+    its own center.
+
+    Anything built at the deck's local X range (center.X + 15..22, where the
+    resource-node and event-socket corners both happen to land) that assumes
+    flat ground needs this instead of a flat 0/0.5, or it sinks into the
+    deck by however far short of it that flat offset falls -- measured at
+    1.4 to 1.8 studs during the Bramblewake walkthrough of 2026-08-11.
+]]
+local function bridgeDeckTopY(localZ: number): number
+    local plankIndex = localZ / 4.4
+    return 1.4 + math.abs(plankIndex) * 0.2
+end
+
 local function fernCluster(
     parent: Instance,
     center: Vector3,
     scale: number,
     ambientSwayTag: string?
 )
-    for blade = 1, 6 do
-        local angle = (blade / 6) * math.pi * 2
+    for blade = 1, 5 do
+        local angle = (blade / 5) * math.pi * 2
         local frond = part(
             parent,
             "BrambleFern",
@@ -82618,6 +82674,30 @@ local function pathArm(parent: Instance, center: Vector3, neighbor: Vector3)
     end
 end
 
+-- Remove only tall, solid procedural geometry from the twelve-stud-wide seam
+-- between connected cells. Route surfaces stay; trees, posts, walls, and roots
+-- that accidentally land across the road do not. Authored mesh dressing is
+-- already non-colliding and non-querying in MeshTemplateLoader.
+local function clearRouteCorridor(regionModel: Instance, from: Vector3, to: Vector3): number
+    local midpoint = (from + to) / 2
+    local removed = 0
+    for _, descendant in regionModel:GetDescendants() do
+        if
+            descendant:IsA("BasePart")
+            and descendant.CanCollide
+            and descendant.Size.Y > 2.5
+            and descendant.Name ~= "StreamingCellCollision"
+        then
+            local offset = descendant.Position - midpoint
+            if math.abs(offset.X) < 12 and math.abs(offset.Z) < 12 then
+                descendant:Destroy()
+                removed += 1
+            end
+        end
+    end
+    return removed
+end
+
 local function evacuationRoadMarker(
     parent: Instance,
     center: Vector3,
@@ -82738,7 +82818,7 @@ local function moduleDressing(
         WET_EARTH,
         Enum.Material.Mud
     )
-    for index = 1, math.floor(13 * scale) do
+    for index = 1, math.floor(9 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(12, 31)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
@@ -82756,12 +82836,12 @@ local function moduleDressing(
             rootTangle(
                 parent,
                 position + Vector3.new(1, 0, -1),
-                random:NextNumber(0.65, 1.1),
+                random:NextNumber(0.65, 1.0),
                 seed + index
             )
         end
     end
-    for index = 1, math.floor(10 * scale) do
+    for index = 1, math.floor(6 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(7, 28)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
@@ -82792,7 +82872,7 @@ local function moduleDressing(
             parent,
             center + Vector3.new(0, 0, 5),
             FOXFIRE,
-            5,
+            3,
             24,
             seed + 1301,
             runtimeIds.AmbientMoteTag
@@ -83007,6 +83087,17 @@ local function dress(
     yaw: number,
     seed: number
 )
+    -- Hero trees were authored for skyline use. At their original scale they
+    -- filled the third-person camera in four route modules and became
+    -- near-black foreground slabs during the Blackout. Keep the silhouettes,
+    -- while restoring camera and combat sightline space around the road.
+    if
+        assetId == "mesh_conifer_hero_a"
+        or assetId == "mesh_conifer_hero_b"
+        or assetId == "mesh_broadleaf_hero_a"
+    then
+        scale *= 0.82
+    end
     table.insert(extra, {
         assetId = assetId,
         fallbackKind = "asset_dressing",
@@ -83534,6 +83625,18 @@ local function buildModuleVisual(
         end
     elseif visual == "farm" then
         local shell = buildFarm(parent, center)
+        -- One road-facing practical keeps the authored farmhouse doorway,
+        -- wall, and chimney readable instead of a single black silhouette.
+        lantern(parent, center + Vector3.new(11, 0, 15), 0.72, runtimeIds.AmbientLightTag)
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(11, 0, 15),
+            0.82,
+            0,
+            2430
+        )
         return {
             assetId = "mesh_crooked_farmhouse_a",
             fallbackKind = "placeholder",
@@ -83740,9 +83843,19 @@ local function buildModuleVisual(
             0,
             2497
         )
-        local beacon =
-            orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
-        light(beacon, AMBER, 3, 36, true)
+        -- The old six-stud neon sphere swallowed the physical gate in bloom.
+        -- The gate is the destination; this is its restrained hanging light.
+        local beacon = orb(
+            parent,
+            "WayhomeLight",
+            center + Vector3.new(0, 7.2, 0),
+            2.4,
+            AMBER,
+            Enum.Material.Neon
+        )
+        beacon.Transparency = 0.22
+        beacon.CastShadow = false
+        light(beacon, AMBER, 2.1, 24)
         billboard(beacon, Strings.get("bramblewake.wayhome_gate"), CREAM)
         objectIcon(beacon, "wayhome", AMBER)
     end
@@ -84651,13 +84764,22 @@ local function buildEventSocket(
     center: Vector3,
     definition: any,
     runtimeIds: any,
-    extra: { any }
+    extra: { any },
+    isBridge: boolean?
 ): any
+    -- The socket's fixed local corner (X=22, Z=-19) sits inside the
+    -- RootBridgePlank deck's own footprint (X 15.5..22.5, Z spanning every
+    -- plank from -19.85 to 19.85) on "bridge" visual modules. baseY keeps
+    -- everything anchored to this socket -- the socket plate itself, the
+    -- scene dressing, and every interaction step below, all of which are
+    -- offset from `anchor.Position` -- sitting on the deck instead of
+    -- sunk into it.
+    local baseY = if isBridge then bridgeDeckTopY(-19) else 0.5
     local anchor = part(
         parent,
         "EventSocket",
         Vector3.new(7, 1, 7),
-        CFrame.new(center + Vector3.new(22, 0.5, -19)),
+        CFrame.new(center + Vector3.new(22, baseY, -19)),
         Color3.fromRGB(99, 72, 48),
         Enum.Material.WoodPlanks
     )
@@ -84680,7 +84802,7 @@ local function buildEventSocket(
     scene:SetAttribute("VisualKind", definition.visual)
     scene.Parent = parent
 
-    local sceneAt = center + Vector3.new(22, 0, -19)
+    local sceneAt = center + Vector3.new(22, baseY - 0.5, -19)
     if definition.visual == "wagon" then
         -- A wagon that did not make it, and the load it was carrying.
         dress(extra, "mesh_creator_crate_a", parent, sceneAt + Vector3.new(3, 0, 2), 1, 0.6, 2560)
@@ -85257,10 +85379,10 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         it -- density still climbs with distance, just starting politely.
     ]]
     local ranks = {
-        { radius = reach + 36, count = 26, height = 40, width = 5.2, shade = 1.0 },
-        { radius = reach + 124, count = 42, height = 54, width = 6.2, shade = 0.86 },
-        { radius = reach + 232, count = 58, height = 70, width = 7.6, shade = 0.7 },
-        { radius = reach + 350, count = 68, height = 88, width = 9.2, shade = 0.56 },
+        { radius = reach + 48, count = 20, height = 40, width = 5.2, shade = 1.0 },
+        { radius = reach + 136, count = 30, height = 54, width = 6.2, shade = 0.86 },
+        { radius = reach + 244, count = 40, height = 70, width = 7.6, shade = 0.7 },
+        { radius = reach + 362, count = 48, height = 88, width = 9.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
         for index = 1, rank.count do
@@ -85674,7 +85796,7 @@ local function buildBlackoutLayer(
             Three 3.5-stud pillars at 5.5-stud spacing leave 2-stud gaps, and
             they stand 4.5 studs off the relay on the side the road arrives
             from -- so built solid they are a barricade across the one thing
-            the player is running an 18-second carried-fire timer to reach, at
+            the player is running a timed carried-fire route to reach, at
             all three relays. Delivering rootfire only recolored them and left
             them solid, so succeeding changed how they looked without changing
             whether anyone could get past them.
@@ -85783,7 +85905,8 @@ local function buildResourceNodes(
     runtimeIds: any,
     nodes: { any },
     meshPlacements: { any },
-    hostsEliteArena: boolean?
+    hostsEliteArena: boolean?,
+    isBridge: boolean?
 )
     if moduleIndex < 2 then
         return
@@ -85802,7 +85925,16 @@ local function buildResourceNodes(
             overlapping.
         ]]
         local lane = if hostsEliteArena then -(slot - 1.5) else (slot - 1.5)
-        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, lane * 18)
+        -- The first farm harvest node used to sit 3.16 studs from the first
+        -- relay root. Put that one node on the far half of its side lane so
+        -- the prompts, labels, and touch targets no longer occupy one spot.
+        local laneZ = if moduleIndex == 3 and slot == 1 then 9 else lane * 18
+        -- The side == 1 corner (local X = +15..19) sits inside the
+        -- RootBridgePlank deck's footprint (X 15.5..22.5) on "bridge"
+        -- visual modules, so a flat Y = 0 there sinks the node's stump/sap
+        -- mesh into the deck instead of resting on it.
+        local nodeY = if isBridge and side == 1 then bridgeDeckTopY(laneZ) else 0
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), nodeY, laneZ)
         local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
 
         local anchor = part(
@@ -85965,7 +86097,8 @@ function BramblewakeBuilder.build(
             runtimeIds,
             resourceNodes,
             meshPlacements,
-            definition.eliteId ~= nil
+            definition.eliteId ~= nil,
+            definition.visual == "bridge"
         )
         local moduleDressingExtra = {}
         -- The yaw of the road as it reaches this module, taken from the
@@ -86174,7 +86307,8 @@ function BramblewakeBuilder.build(
                 center,
                 generator.eventDefinition(placement.eventId),
                 runtimeIds,
-                meshPlacements
+                meshPlacements,
+                definition.visual == "bridge"
             )
             eventSockets[placement.eventId] = eventResult.socket
             for interactionIndex, interaction in eventResult.interactions do
@@ -86229,6 +86363,16 @@ function BramblewakeBuilder.build(
             arrivalSign:SetAttribute("ArrivalLandmark", true)
         end
     end
+
+    -- Module visuals are authored independently, so clear the connection
+    -- seams only after every module has placed its procedural geometry. This
+    -- closes the Module 2/3 hard stop and the Module 3/4 forced detour found
+    -- by physically walking the route rather than teleporting through it.
+    local clearedRouteObstacles = 0
+    for index = 1, #centers - 1 do
+        clearedRouteObstacles += clearRouteCorridor(expedition, centers[index], centers[index + 1])
+    end
+    expedition:SetAttribute("ClearedRouteObstacleCount", clearedRouteObstacles)
 
     local bossArena = buildWardenSeal(
         expedition,
@@ -91189,6 +91333,33 @@ export type Entry = {
     -- re-sourcing the asset, and it happens once per template rather than
     -- once per placement.
     restyleParts: { { match: { number }, color: { number }?, material: string? } }?,
+    -- Fixed-shape corrections for individual sub-parts of the source model,
+    -- applied once at template load (before scaling/normalization) so every
+    -- placement of the asset gets it, not just the ones that happened to be
+    -- audited. Each fix finds the first BasePart descendant whose Size
+    -- matches `matchSize` (within a small tolerance) and rotates it in
+    -- place about its OWN pivot -- the rest of the model, and the matched
+    -- part's own position, are untouched. Use this only when a part is
+    -- internally inconsistent with the rest of the SAME asset (a signboard
+    -- welded on upside down relative to its own post, a cap authored askew
+    -- relative to the body it sits on); a whole-model problem belongs in
+    -- sourceYawDegrees instead, which this does not replace.
+    partOrientationFixes: {
+        {
+            matchSize: { number },
+            -- Degrees to rotate the matched part about its own local
+            -- X/Y/Z axes (applied as `part.CFrame * CFrame.Angles(...)`,
+            -- so the rotation is local to the part, not the world).
+            localRotationDegrees: { number }?,
+            -- Alternative to localRotationDegrees: copy the orientation of
+            -- another sibling part in the same model, matched by ITS size,
+            -- and keep the target part's own position. Use when the
+            -- correct orientation isn't a clean multiple-of-90 rotation
+            -- away from the broken one, but a sibling part in the same
+            -- asset already has the orientation the target should share.
+            copyOrientationFromSize: { number }?,
+        }
+    }?,
 }
 
 local ENTRIES: { Entry } = {
@@ -91511,6 +91682,14 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = false,
     },
+    -- The cap/handle MeshPart (0.36 x 0.84 x 1.01) ships welded on at a
+    -- compound tilt (measured up-vector dot with world-up of -0.94, roughly
+    -- 160 degrees from upright) while the body it sits directly on top of
+    -- (1.10 x 1.97 x 1.10) is correctly upright. Every placement of this
+    -- lantern -- there are dozens across Bramblewake alone -- ships with an
+    -- inverted cap. Fixed by copying the body's orientation onto the cap at
+    -- template load; the Roundtable-audit finding this closed is the
+    -- Bramblewake walkthrough of 2026-08-11.
     {
         id = "mesh_creator_kerosene_lantern_a",
         assetId = 11865884168,
@@ -91521,6 +91700,16 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        partOrientationFixes = {
+            {
+                matchSize = { 0.35983961820602417, 0.8399349451065063, 1.007790446281433 },
+                copyOrientationFromSize = {
+                    1.1010892391204834,
+                    1.9716554880142212,
+                    1.1010887622833252,
+                },
+            },
+        },
     },
     {
         id = "mesh_creator_first_lantern_a",
@@ -91597,6 +91786,15 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = true,
     },
+    -- The lower signboard Union (2.20 x 0.49 x 0.07) ships rotated 180
+    -- degrees about its own length axis relative to the upper signboard
+    -- Union on the same post (0.07 x 0.49 x 2.20, correctly oriented) --
+    -- both boards' length axes already point the same way in world space,
+    -- only the lower one reads upside down. Confirmed against every
+    -- placement in the Bramblewake stag-tracks event (2026-08-11 walkthrough),
+    -- so this is a template defect, not a per-placement one. Fixed by
+    -- flipping the lower board 180 degrees about its own local X axis
+    -- (its length axis), which does not move it.
     {
         id = "mesh_creator_forest_sign_a",
         assetId = 82202632313902,
@@ -91607,6 +91805,12 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        partOrientationFixes = {
+            {
+                matchSize = { 2.1965529918670654, 0.4913640022277832, 0.0657959058880806 },
+                localRotationDegrees = { 180, 0, 0 },
+            },
+        },
     },
     {
         id = "mesh_creator_tool_set_a",
@@ -92250,6 +92454,81 @@ local function applyProfileScale(model: Model, profileScale: Vector3)
     end
 end
 
+type PartOrientationFix = {
+    matchSize: { number },
+    localRotationDegrees: { number }?,
+    copyOrientationFromSize: { number }?,
+}
+
+-- Sizes are compared with a small epsilon rather than exactly: they survive
+-- the LoadAsset round-trip bit-for-bit in practice, but a Union's Size is
+-- derived geometry and float noise on the order of 1e-5 has been observed
+-- between otherwise-identical loads.
+local SIZE_MATCH_EPSILON = 0.01
+
+local function sizeCloseEnough(a: Vector3, b: { number }): boolean
+    return math.abs(a.X - b[1]) <= SIZE_MATCH_EPSILON
+        and math.abs(a.Y - b[2]) <= SIZE_MATCH_EPSILON
+        and math.abs(a.Z - b[3]) <= SIZE_MATCH_EPSILON
+end
+
+local function findPartBySize(model: Model, size: { number }, exclude: BasePart?): BasePart?
+    for _, descendant in model:GetDescendants() do
+        if
+            descendant:IsA("BasePart")
+            and descendant ~= exclude
+            and sizeCloseEnough(descendant.Size, size)
+        then
+            return descendant
+        end
+    end
+    return nil
+end
+
+-- Runs once per template load (see the field comment on
+-- MeshAssetRegistry.Entry.partOrientationFixes for why this is not the same
+-- job as sourceYawDegrees). Matching by Size rather than by name or index
+-- because Creator Store imports generally don't carry stable, descriptive
+-- part names -- Size is the one property that's both distinctive enough to
+-- pick out one part among a model's siblings and untouched by anything this
+-- loader does before this point in the pipeline.
+local function applyPartOrientationFixes(
+    model: Model,
+    fixes: { PartOrientationFix }?,
+    logger: Logger,
+    stableId: string
+)
+    if fixes == nil then
+        return
+    end
+    for _, fix in fixes do
+        local target = findPartBySize(model, fix.matchSize)
+        if target == nil then
+            logger:info("mesh_orientation_fix_part_not_found", {
+                assetId = stableId,
+                matchSize = tostring(fix.matchSize),
+            })
+            continue
+        end
+        if fix.localRotationDegrees ~= nil then
+            local r = fix.localRotationDegrees
+            target.CFrame = target.CFrame
+                * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
+        elseif fix.copyOrientationFromSize ~= nil then
+            local reference = findPartBySize(model, fix.copyOrientationFromSize, target)
+            if reference == nil then
+                logger:info("mesh_orientation_fix_reference_not_found", {
+                    assetId = stableId,
+                    matchSize = tostring(fix.copyOrientationFromSize),
+                })
+                continue
+            end
+            target.CFrame = CFrame.new(target.Position)
+                * (reference.CFrame - reference.CFrame.Position)
+        end
+    end
+end
+
 function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
     return setmetatable({
         _logger = logger,
@@ -92362,6 +92641,11 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         -- PrimaryPart carrying its own rotation, which Creator Store models do.
         loaded:PivotTo(loaded:GetPivot() * CFrame.Angles(0, -math.rad(sourceYaw), 0))
     end
+    -- Per-part corrections (a sub-part authored wrong relative to the rest
+    -- of the SAME asset) run after the whole-model yaw cancel above and
+    -- before the bounding box is measured, so a corrected part's true
+    -- extents are what normalization and every later placement see.
+    applyPartOrientationFixes(loaded, entry.partOrientationFixes, self._logger, stableId)
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)
@@ -96989,7 +97273,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 25, "unexpected save schema version")
-assert(Config.BuildVersion == "0.53.1", "unexpected build version")
+assert(Config.BuildVersion == "0.53.2", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -98666,7 +98950,7 @@ for _, target in blackoutTargets do
     )
 end
 -- The rooted walls are silhouettes. They stand between the road and the relay
--- the player is carrying an 18-second fire to, three pillars with 2-stud gaps
+-- the player is carrying a timed fire to, three pillars with 2-stud gaps
 -- at every one of the three relays, and the chapter's own traversal gate is
 -- that every carry is possible with base movement. Solid, they are a barricade;
 -- queryable, they eat the tap that should reach the relay behind them.
@@ -103875,6 +104159,10 @@ end
 
 function HUDController._layout(self: HUDController)
     local viewport, scale, canvasWidth, _canvasHeight = canvasMetrics()
+    local blackout = if self._currentState ~= nil then self._currentState.blackout else nil
+    local blackoutActive = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
     --[[
         Treat any touch device, and any short viewport, as the touch layout.
 
@@ -103907,9 +104195,13 @@ function HUDController._layout(self: HUDController)
         -- objective text cannot run past the right edge on a small screen.
         local cardWidth = math.max(260, math.min(470, canvasWidth - 36))
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
+        -- The Blackout rail already carries stage and progress. While it is
+        -- present, keep the objective card to its trail/title pair instead of
+        -- stacking the same instruction twice over world prompts.
+        local compactObjective = self._compactEnabled or blackoutActive
         self._objectiveFrame.Size =
-            UDim2.fromOffset(cardWidth, if self._compactEnabled then 78 else 112)
-        self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
+            UDim2.fromOffset(cardWidth, if compactObjective then 78 else 112)
+        self._resource.Position = UDim2.fromOffset(18, if compactObjective then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         --[[
@@ -103926,8 +104218,8 @@ function HUDController._layout(self: HUDController)
         -- Tucked under the objective panel on the left rather than spanning
         -- the screen at eye level. At full width it sat straight across the
         -- middle of the view for the whole nine minutes of a Blackout.
-        self._blackoutFrame.Position = UDim2.fromOffset(18, 196)
-        self._blackoutFrame.Size = UDim2.fromOffset(cardWidth, 70)
+        self._blackoutFrame.Position = UDim2.fromOffset(18, 156)
+        self._blackoutFrame.Size = UDim2.fromOffset(cardWidth, 58)
         self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
             UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 222 else 150)
@@ -104274,6 +104566,13 @@ function HUDController._updateClock(self: HUDController)
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
+            elseif blackout.overtime then
+                self._blackoutDetail.Text = string.format(
+                    Strings.get("hud.overtime_relay_active_take_rootfire_n_n_n"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
             else
                 self._blackoutDetail.Text = string.format(
                     Strings.get("hud.take_rootfire_n_n_n"),
@@ -104481,6 +104780,10 @@ function HUDController.update(self: HUDController, state: any)
     self._mara.Visible = departedWorld
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
+    -- The Blackout rail carries the same next-step detail in a smaller,
+    -- time-aware form. Hiding this duplicate line on touch-height screens
+    -- preserves the world prompt and route beneath the upper-left cards.
+    self._detail.Visible = not self._compactEnabled and not blackoutActive
     self._progress.Text = string.format(
         "%s · %d / %d",
         tostring(state.trailName or Strings.get("hud.first_light")),
