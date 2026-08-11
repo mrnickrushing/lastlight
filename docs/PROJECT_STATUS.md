@@ -7,11 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = `40dadf0` (PR #383), build `0.53.2`,
+Last updated: 2026-08-11, at `main` = `7c06607` (PR #390), build `0.53.2`,
 save schema 25, 27 services. The last published artifact remains Roblox place
-version 171 from `5b7d4dd`; PR #383 has not been published yet. The Module 1-2
-placement follow-up is in review as PR #390 on
-`agent/bramblewake-modules-1-2-placement-fixes`;
+version 171 from `5b7d4dd`; PRs #383 and #390 have not been published yet.
 **#387 leaves Cinderfall shut for the third wave running, and closes the
 last route anybody had left to try.** Play mode is unreachable on this
 machine, and the two things that looked like ways around it are now
