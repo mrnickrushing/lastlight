@@ -126,7 +126,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **In flight (`agent/bramblewake-walkthrough-fixes`)** **The complete physical
+- **#388 (in review)** **The complete physical
   Bramblewake walk found route, readability, feedback and performance defects,
   and build `0.53.2` repairs them as one coherent pass.** The source clears tall
   procedural collision at every module seam, moves the first resource prompt
