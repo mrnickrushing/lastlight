@@ -7,14 +7,21 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #385, build `0.53.1`,
+Last updated: 2026-08-10, at `main` = PR #387, build `0.53.1`,
 save schema 25, 27 services. Published to Roblox as place version 170;
-#385 leaves Cinderfall shut for the second wave running and names the
-reason precisely — **Play mode is unreachable on this machine, so no
-region's live walk can be started at all** (the recipe and the evidence
-are in [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md)) — and ships the arena
-label defect that reading found instead, in the Crown *and* in Tempest,
-which is already open. #384 wires Cinderfall's three encounters and fixes
+**#387 leaves Cinderfall shut for the third wave running, and closes the
+last route anybody had left to try.** Play mode is unreachable on this
+machine, and the two things that looked like ways around it are now
+measured shut: the relay is provably healthy while `start_stop_play`
+latches, and `user_mouse_input`/`user_keyboard_input` are
+`datamodel_type` **`Client` only**, so they live inside Play rather than
+leading to it (the evidence is in
+[STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md)). It also records the thing
+reading found instead: **the Hollow Below has no runtime at all**, so the
+finale is a wave rather than a walk. #385 leaves Cinderfall shut for the
+second wave running and names the same reason, and ships the arena label
+defect that reading found instead, in the Crown *and* in Tempest, which is
+already open. #384 wires Cinderfall's three encounters and fixes
 the generation fallback that made one Crown run in fifteen the same fixed
 layout, and deliberately leaves the region shut, because its live walk was
 never finished.
@@ -118,6 +125,92 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#387** **The Crown stays shut a third time, and this wave spends itself
+  proving there is no way round rather than looking for one.** Cinderfall was
+  queued to open again. `Regions.luau`, `RegionBuilders.walkable`, the feature
+  flag and its rollout stage are all untouched, and the four specs that pin the
+  open set by name still pin five. **A region never ships enabled but unwalked**,
+  and this is the third session in a row where the walk could not be started at
+  all.
+
+  **Two clean attempts, and "clean" is the whole of the claim.** Each one was a
+  full teardown (`pkill -9` on `RobloxStudioBeta.exe`, `StudioMCP.exe`,
+  `wineserver`, `winedevice.exe`, `AutoSaves/*.rbxl` removed), a place rebuilt
+  from this revision, a freshly launched Studio, **one** relay started and
+  confirmed with `list_roblox_studios` before anything else, and **exactly one**
+  `start_stop_play` call. Both latched. Studio stayed in Edit with `Available
+  DataModels: Edit` throughout, and its own log recorded **no playtest activity
+  whatsoever** — no Play DataModel, no plugin load for one, only session
+  heartbeats and autosave ticks. It is not trying and failing; the request
+  reaches nothing.
+
+  **The relay theory is now disproved rather than untested, and that matters
+  because it was the best hope going in.** #385 established that the relay must
+  outlive individual tool calls, which is true and stays in the runbook. It is
+  not this. While `start_stop_play` sat outstanding, `get_studio_state`,
+  `execute_luau` and `list_roblox_studios` each answered in under a second,
+  repeatedly, for the whole of both attempts. A dead relay fails *every* call;
+  this fails exactly one, which is how you tell them apart and why the two were
+  confused for a session and a half.
+
+  **The find that actually closes the question is one line of a tool schema.**
+  `user_mouse_input` and `user_keyboard_input` both declare `datamodel_type`
+  with `"enum": ["Client"]` — one permitted value, and the Client DataModel does
+  not exist in Edit mode. Their own descriptions say to use `start_stop_play`
+  first. **They are downstream of the broken call, not around it.** The natural
+  reading of the earlier successful walks is the exact opposite — those sessions
+  really did drive Bramblewake, the Delve, the Fen, the Reach and the Vale with
+  these tools — but every one of them was already in Play before it touched one.
+  There is no second door, and the next session should not spend itself looking
+  for one. `execute_luau` does run at **plugin security** (`settings()`,
+  `StudioService` and `RunService.Run` are all reachable), which is a wider
+  surface than anyone had claimed and still not a way in: `RunService:Run()` is
+  simulation inside the Edit DataModel with no client, and nothing at plugin
+  level can manufacture a `LocalPlayer`. A walk needs a character to stand
+  somewhere and a prompt pressed by one.
+
+  **What reading found instead is bigger than the Crown, and it was queued as if
+  it were small.** The Hollow Below was next on the list after Cinderfall, on
+  the understanding that its encounter logic had already been driven through all
+  five scenes to all three endings and only a live walk was missing. The logic
+  has been; the walk is not what is missing. **Nothing in the running game can
+  reach the Hollow**, because nothing in the running game knows about it.
+  `NamelessNightEncounter` is required by `SaveSchema` (which reserves its
+  fields) and `Epilogue` (which reads them) and **by nothing else in `src`** —
+  no service among the 27, no builder, no `RegionBuilders` entry at all, so
+  `RegionBuilders.readiness("region_hollow")` answers `unknown region` rather
+  than `walkable = false`. `RegionEncounterWiring` handles five regions and the
+  Hollow is not one; `boss_nameless_night` appears in the chapter catalog, the
+  finale definition and its own module, and in no wiring anywhere.
+  `RegionExpeditionAssembly` names the region only to give it a display string.
+  So the finale is **content without a runtime**: fully authored — five scenes,
+  its points of interest, three endings, chapter seven — fully saved, fully read
+  by the epilogue, and unreachable. That is the shape this project has paid for
+  four times already (120 recipes with no bench, 24 residents with no body,
+  ninety craftable items with no equip button, the 55 localization keys nothing
+  resolves), and it is worth writing down loudly: **the Hollow is a wave, not a
+  walk**, and no amount of Play mode would have produced one this session.
+
+  Nothing under `src/` changes here, so the built place is byte-identical to the
+  one #386 published and place version 170 still stands. **942 Luau tests**,
+  every repository validator green.
+
+  **Open, and now needing a person rather than another attempt:** Play mode
+  cannot be entered from a session on this seat, by any route that exists —
+  `start_stop_play` latches with the relay healthy and Studio idle, the native
+  input tools are `Client`-only and so live inside Play rather than leading to
+  it, and OS-level injection is portal-gated shut (#385). **The Crown, and every
+  region after it, needs somebody at the keyboard to press Play**, or a seat
+  where input is not portal-gated. Three sessions have now confirmed this from
+  three different directions and the cost of a fourth is a whole session.
+
+  **Open, and larger than it was queued as:** the Hollow Below has no runtime.
+  It is authored, saved and read by the epilogue, and no service, builder,
+  encounter wiring or region-builder entry knows it exists, so it cannot be
+  reached in any build regardless of Play mode. Chapter seven is unreachable and
+  the game therefore has no ending a player can arrive at. Building that runtime
+  is the last real feature in the project and it was not on the queue, because
+  the finale's own module passing its specs read as the finale being finished.
 - **#386** (v170) The place-version record for #385. The merged commit `cf55c16`
   was rebuilt on synchronized `main`, passed 942 Luau tests and every repository
   validator, and Open Cloud published that artifact to start place

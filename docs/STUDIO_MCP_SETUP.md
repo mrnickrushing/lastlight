@@ -205,6 +205,54 @@ RemoteDesktop portal, and granting that portal needs a dialog that can only be
 clicked by somebody at the machine. So `start_stop_play` never completes (it
 answers `Start play hasn't finished yet` forever) and `F5` never lands.
 
+#### The relay is healthy while this happens, and the input tools cannot rescue it
+
+Measured again on 2026-08-10, over two attempts that were each a full teardown
+(`pkill -9` on `RobloxStudioBeta.exe`, `StudioMCP.exe`, `wineserver`,
+`winedevice.exe`, `AutoSaves/*.rbxl` cleared), a freshly built place, a freshly
+launched Studio, one long-lived relay established and confirmed with
+`list_roblox_studios` before anything else, and **exactly one**
+`start_stop_play` call. Both latched identically. Three things this pins down,
+because each of them was a plausible way out before it was measured:
+
+**The relay is not the cause, and fixing the relay does not fix this.** While
+`start_stop_play` sat outstanding, `get_studio_state`, `execute_luau` and
+`list_roblox_studios` all answered in under a second, repeatedly, for the whole
+of both attempts. The section above is still true and still worth obeying — a
+relay that exits between calls really does produce `Not connected to the WS
+host` — but a relay that behaves perfectly produces this instead. The two
+failures look nothing alike once you can tell them apart: a dead relay fails
+*every* call, and this fails exactly one.
+
+**Studio is in a state with nothing wrong with it.** Authenticated (`login
+[end][success]`), window mapped at 1916x1002 and `Qt::ApplicationActive`, the
+place fully loaded and answering `execute_luau` about its own contents. The one
+other window Studio owns is a 519x130 dialog that `xwininfo` reports as `Map
+State: IsUnMapped`, so the Auto-Recovery modal described below is **not** what
+is happening here. And Studio's own log records **no playtest activity at all**
+across either attempt — no Play DataModel, no plugin load for one, nothing but
+session heartbeats and autosave ticks. It is not trying and failing; nothing
+reaches it.
+
+**`user_mouse_input` and `user_keyboard_input` cannot be used to get into Play,
+because they only exist inside it.** Both declare `datamodel_type` with
+`"enum": ["Client"]` — a single permitted value, and the Client DataModel does
+not exist in Edit mode. Their own description says to "consider using
+`start_stop_play` to switch to the desired mode and then use the tools". They
+are strictly downstream of the call that is broken. This is worth stating
+outright because the opposite is the natural guess: earlier successful region
+walks did drive gameplay with these tools, which reads as evidence that they
+are a route *to* Play, when in fact every one of those sessions had already got
+into Play some other way first. **There is no second door.**
+
+For completeness, `execute_luau` runs at **plugin security** — `settings()`,
+`StudioService` and `RunService.Run` are all reachable from it. That is a
+larger surface than it looks and it still does not help: `RunService:Run()`
+starts simulation inside the Edit DataModel with no client and no player, and
+nothing at plugin level can manufacture a `LocalPlayer`. A walk needs a
+character to stand somewhere and a prompt to be pressed by one, so Run mode is
+the Edit-mode split below with physics on, not a walk.
+
 **What this costs, stated plainly: there is no Play mode, so there is no live
 walk, so no region can have its flag flipped.** A region ships open only in the
 pull request of its own live walk, and that gate cannot be cleared from a session
