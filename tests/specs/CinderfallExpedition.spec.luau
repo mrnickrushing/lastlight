@@ -130,8 +130,23 @@ return {
             end,
         },
         {
-            -- The same invariant sweep Bramblewake passes, on the Crown's pool.
-            name = "passes 2,000 deterministic Vale seeds",
+            --[[
+                The same invariant sweep Bramblewake passes, on the Crown's
+                pool.
+
+                The source assertion is the half this case was missing, and
+                missing it is why it reported good news for a year. When
+                three assemble attempts all fail validation the generator
+                answers with the known-good fallback, which is valid by
+                construction -- so a sweep that only asks "is what I got
+                back valid" passes at exactly the moment generation is
+                broken, and says nothing. The Crown was falling back on 132
+                seeds in 2,000 while this case was green; every other region
+                falls back on none. What a player lost was variety rather
+                than correctness, which is the kind of defect nothing ever
+                reports.
+            ]]
+            name = "passes 2,000 deterministic Crown seeds without ever falling back",
             run = function()
                 local hashes: { [string]: boolean } = {}
                 for seed = 1, 2000 do
@@ -140,6 +155,11 @@ return {
                     TestRunner.truthy(
                         valid,
                         string.format("seed %d: %s", seed, table.concat(issues, "; "))
+                    )
+                    TestRunner.equal(
+                        manifest.source,
+                        "generated",
+                        string.format("seed %d fell back to the known-good walk", seed)
                     )
                     TestRunner.equal(manifest.regionId, CINDERFALL)
                     TestRunner.equal(#manifest.modules, Cinderfall.ModuleCount)

@@ -21,12 +21,15 @@
 
 local AbbeySilenceEncounter = require("./AbbeySilenceEncounter")
 local AdmiralWreckEncounter = require("./AdmiralWreckEncounter")
+local AshRegentEncounter = require("./AshRegentEncounter")
 local AuroraHartEncounter = require("./AuroraHartEncounter")
 local BellowsMawEncounter = require("./BellowsMawEncounter")
 local DrownedCallerEncounter = require("./DrownedCallerEncounter")
 local ForemanEchoEncounter = require("./ForemanEchoEncounter")
+local GlassBailiffEncounter = require("./GlassBailiffEncounter")
 local IronWidowEncounter = require("./IronWidowEncounter")
 local LanternWitchEncounter = require("./LanternWitchEncounter")
+local LeadActorEncounter = require("./LeadActorEncounter")
 local LighthouseEaterEncounter = require("./LighthouseEaterEncounter")
 local ManyFaceEncounter = require("./ManyFaceEncounter")
 local Strings = require("./Strings")
@@ -972,6 +975,385 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
                         chapterId = "chapter_five",
                         decision = decision,
                         outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_cinderfall" then
+        local beatObjects: { [string]: string } = {
+            beat_bow = Strings.get("encounter.the_bow"),
+            beat_turn = Strings.get("encounter.the_turn"),
+            beat_kneel = Strings.get("encounter.the_kneel"),
+            beat_raise = Strings.get("encounter.the_raise"),
+        }
+        --[[
+            The Actor's own description is that it announces its line
+            "loudly, in order" and that the fight is "not a memory test
+            with the answer hidden". Its instruction only counts the
+            beats ("ANSWER THE LINE -- 1 OF 3"), and the beat it is
+            actually calling rides in `calledBeat`, which no client
+            reads. Announced nowhere, a party is guessing one in four
+            with a wrong guess costing the whole line -- the White
+            Howler's aurora order again, one region later. So the call is
+            spoken here, appended to the encounter's own line rather than
+            replacing it, and every Actor handler goes through this
+            instead of the shared `verb`.
+        ]]
+        local function actorMessage(state: any, userId: number): string
+            local snapshot = LeadActorEncounter.snapshot(state, userId)
+            local instruction = tostring(snapshot.instruction)
+            local called = snapshot.calledBeat
+            if called == nil then
+                return instruction
+            end
+            return string.format(
+                Strings.get("encounter.line_call"),
+                instruction,
+                beatObjects[called]
+            )
+        end
+
+        local actorInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = function(
+                state: any,
+                player: any,
+                _now: number
+            ): (any, any)
+                local nextState, result = LeadActorEncounter.activate(state, player.UserId)
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = actorMessage(nextState, player.UserId),
+                    }
+            end,
+        }
+        local actorAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.lead_actor")
+            ),
+        }
+        for _, beatId in LeadActorEncounter.BeatIds do
+            table.insert(
+                actorAnchors,
+                anchor(beatId, Strings.get("expedition.answer"), beatObjects[beatId])
+            )
+            actorInteractions[beatId] = function(state: any, player: any, _now: number): (any, any)
+                local nextState, result =
+                    LeadActorEncounter.answerBeat(state, player.UserId, beatId)
+                --[[
+                    A missed beat sends the line back to its first beat
+                    and nothing else changes, so the instruction returns
+                    to "ANSWER THE LINE -- 0 OF n" and a party reads it
+                    as the press having done nothing. The loss gets its
+                    own line, the way the Titan's already-worked gate and
+                    the Howler's lost trail do -- and it still carries the
+                    next call, because the scene does not stop to explain
+                    itself.
+                ]]
+                if type(result) == "table" and result.missed == true then
+                    return nextState,
+                        {
+                            accepted = false,
+                            completed = false,
+                            message = string.format(
+                                Strings.get("encounter.line_call"),
+                                Strings.get("encounter.the_line_starts_again_from_the"),
+                                beatObjects[LeadActorEncounter.expectedBeat(nextState)]
+                            ),
+                        }
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = actorMessage(nextState, player.UserId),
+                    }
+            end
+        end
+        --[[
+            The broken scene closes on its own. `resume` is the Actor's
+            own verb and the state carries no timestamp, so the clock
+            lives here the way the Admiral's re-rig and the Hart's split
+            do. The first tick that sees a broken scene only starts the
+            count; nothing resumes on the tick that broke it.
+        ]]
+        local resumeAt: number? = nil
+        local function actorTick(state: any, now: number): any?
+            if state.status ~= "broken" then
+                resumeAt = nil
+                return nil
+            end
+            if resumeAt == nil then
+                resumeAt = now + LeadActorEncounter.Tuning.brokenSeconds
+                return nil
+            end
+            if now < resumeAt then
+                return nil
+            end
+            resumeAt = nil
+            local nextState = LeadActorEncounter.resume(state)
+            return if nextState == state then nil else nextState
+        end
+
+        local structureObjects: { [string]: string } = {
+            structure_west_arcade = Strings.get("encounter.the_west_arcade"),
+            structure_stand = Strings.get("encounter.the_stand"),
+            structure_press = Strings.get("encounter.the_press"),
+            structure_dock = Strings.get("encounter.the_dock"),
+        }
+        --[[
+            Which structure is marked is the only fact this fight turns
+            on, and like the Actor's called beat it rides in the snapshot
+            (`marked`) and reaches no client. An arena of four identical
+            prompts with "IT HAS MARKED SOMETHING -- APPEAL IT" over them
+            is four guesses at a seven-second clock, so the mark is named
+            here beside the instruction. It answers the wrong-structure
+            press too: the module's refusal is `not_marked`, whose honest
+            reading is "not that one, that one" rather than "nothing".
+        ]]
+        local function bailiffMessage(state: any, userId: number): string
+            local snapshot = GlassBailiffEncounter.snapshot(state, userId)
+            local instruction = tostring(snapshot.instruction)
+            if snapshot.marked == nil then
+                return instruction
+            end
+            return string.format(
+                Strings.get("encounter.marked_call"),
+                instruction,
+                structureObjects[snapshot.marked]
+            )
+        end
+
+        local bailiffInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = function(
+                state: any,
+                player: any,
+                _now: number
+            ): (any, any)
+                local nextState, result = GlassBailiffEncounter.activate(state, player.UserId)
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = bailiffMessage(nextState, player.UserId),
+                    }
+            end,
+        }
+        local bailiffAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.glass_bailiff")
+            ),
+        }
+        for _, structureId in GlassBailiffEncounter.StructureIds do
+            table.insert(
+                bailiffAnchors,
+                anchor(structureId, Strings.get("encounter.appeal"), structureObjects[structureId])
+            )
+            bailiffInteractions[structureId] = function(
+                state: any,
+                player: any,
+                _now: number
+            ): (any, any)
+                local nextState, result =
+                    GlassBailiffEncounter.appeal(state, player.UserId, structureId)
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = bailiffMessage(nextState, player.UserId),
+                    }
+            end
+        end
+        --[[
+            The Bailiff's whole cycle is on the service's clock: it marks,
+            it carries the sentence out, and it sits back down. The module
+            exports all three verbs and stores no timestamps, so the
+            cadence lives here.
+
+            Two tuning values cover three waits, and the one they do not
+            name is how long the window stays open. It gets
+            `sentenceSeconds` as well, deliberately: the opening a party
+            buys is exactly as long as the sentence it paid a wall for,
+            which is the trade the fight is about stated in its own
+            currency rather than a third number invented at the seam.
+        ]]
+        local markAt: number? = nil
+        local sentenceAt: number? = nil
+        local adjournAt: number? = nil
+        local function bailiffTick(state: any, now: number): any?
+            if state.status == "sitting" then
+                adjournAt = nil
+                if state.marked == nil then
+                    sentenceAt = nil
+                    if markAt == nil then
+                        markAt = now + GlassBailiffEncounter.Tuning.markIntervalSeconds
+                        return nil
+                    end
+                    if now < markAt then
+                        return nil
+                    end
+                    markAt = nil
+                    local nextState = GlassBailiffEncounter.mark(state)
+                    return if nextState == state then nil else nextState
+                end
+                markAt = nil
+                if sentenceAt == nil then
+                    sentenceAt = now + GlassBailiffEncounter.Tuning.sentenceSeconds
+                    return nil
+                end
+                if now < sentenceAt then
+                    return nil
+                end
+                sentenceAt = nil
+                local nextState = (GlassBailiffEncounter.carryOut(state))
+                return if nextState == state then nil else nextState
+            elseif state.status == "sentencing" then
+                markAt, sentenceAt = nil, nil
+                if adjournAt == nil then
+                    adjournAt = now + GlassBailiffEncounter.Tuning.sentenceSeconds
+                    return nil
+                end
+                if now < adjournAt then
+                    return nil
+                end
+                adjournAt = nil
+                local nextState = GlassBailiffEncounter.adjourn(state)
+                return if nextState == state then nil else nextState
+            end
+            markAt, sentenceAt, adjournAt = nil, nil, nil
+            return nil
+        end
+
+        local statueObjects: { [string]: string } = {
+            statue_first = Strings.get("encounter.the_first_statue"),
+            statue_second = Strings.get("encounter.the_second_statue"),
+            statue_third = Strings.get("encounter.the_third_statue"),
+            statue_fourth = Strings.get("encounter.the_fourth_statue"),
+            statue_fifth = Strings.get("encounter.the_fifth_statue"),
+        }
+        local regentInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AshRegentEncounter),
+        }
+        local regentAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.ash_regent")
+            ),
+        }
+        for _, statueId in AshRegentEncounter.StatueIds do
+            --[[
+                Reading a statue and breaking it are separate anchors, for
+                the Witch's and the Titan's reason: reading is free and
+                repeatable, breaking cannot be undone, and breaking a true
+                one is the chapter's decision. A decision that shares a
+                button with the free look at it is a misclick somebody
+                has to live with for an epilogue.
+            ]]
+            table.insert(
+                regentAnchors,
+                anchor(statueId, Strings.get("expedition.read"), statueObjects[statueId])
+            )
+            --[[
+                What a read taught you is the entire point of reading, and
+                the Regent's instruction only ever counts anchors -- so an
+                inspection that answered with the instruction would look
+                exactly like an inspection that did nothing. `authentic`
+                is spoken here; it is the one thing in this fight that
+                costs nothing but time, and the Crown's threat is time.
+            ]]
+            regentInteractions[statueId] = function(
+                state: any,
+                player: any,
+                now: number
+            ): (any, any)
+                local nextState, result = AshRegentEncounter.inspect(state, player.UserId, statueId)
+                if type(result) == "table" and result.accepted == true then
+                    --[[
+                        Both keys are written out rather than chosen into
+                        a variable, because `validate_localization.py`
+                        follows `Strings.get` by its literal argument and
+                        a key it cannot see is a key it reports as read by
+                        nothing -- which is how a translator ends up
+                        paying for a line no player was ever shown.
+                    ]]
+                    local message = if result.authentic == true
+                        then string.format(
+                            Strings.get("encounter.statue_reads_real"),
+                            statueObjects[statueId]
+                        )
+                        else string.format(
+                            Strings.get("encounter.statue_reads_cast"),
+                            statueObjects[statueId]
+                        )
+                    return nextState, { accepted = true, completed = false, message = message }
+                end
+                return nextState,
+                    {
+                        accepted = false,
+                        completed = false,
+                        message = instructionOf(AshRegentEncounter, nextState, player.UserId, now),
+                    }
+            end
+            local breakId = statueId .. "_break"
+            table.insert(
+                regentAnchors,
+                anchor(breakId, Strings.get("town.break"), statueObjects[statueId])
+            )
+            regentInteractions[breakId] = verb(
+                AshRegentEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return AshRegentEncounter.breakStatue(state, userId, statueId)
+                end
+            )
+        end
+
+        return {
+            {
+                id = LeadActorEncounter.Id,
+                regionId = regionId,
+                module = LeadActorEncounter,
+                anchors = actorAnchors,
+                interactions = actorInteractions,
+                tick = actorTick,
+            },
+            {
+                id = GlassBailiffEncounter.Id,
+                regionId = regionId,
+                module = GlassBailiffEncounter,
+                anchors = bailiffAnchors,
+                interactions = bailiffInteractions,
+                tick = bailiffTick,
+            },
+            {
+                id = AshRegentEncounter.Id,
+                regionId = regionId,
+                module = AshRegentEncounter,
+                anchors = regentAnchors,
+                interactions = regentInteractions,
+                lockedUntil = { LeadActorEncounter.Id, GlassBailiffEncounter.Id },
+                chapterResolution = function(state: any)
+                    --[[
+                        The fight counts the authentic statues a party
+                        chose to break and nothing else, so the decision
+                        reads off the same count the outcome does. The
+                        catalog already names all three, because the
+                        chapter was written before the fight was wired.
+                    ]]
+                    local erased = tonumber(state.erased) or 0
+                    local decision = if erased == 0
+                        then "spared_memories"
+                        elseif erased >= 3 then "broke_them_all"
+                        else "broke_some"
+                    return {
+                        chapterId = "chapter_six",
+                        decision = decision,
+                        outcome = tostring(AshRegentEncounter.outcome(state)),
                     }
                 end,
             },

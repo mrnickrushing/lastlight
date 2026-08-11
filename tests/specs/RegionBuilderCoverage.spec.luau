@@ -125,6 +125,47 @@ return {
                 TestRunner.equal(byId.region_tempest.enabled, true)
                 TestRunner.equal(byId.region_frostmere.enabled, true)
                 TestRunner.equal(byId.region_cinderfall.enabled, false)
+                TestRunner.equal(byId.region_hollow.enabled, false)
+            end,
+        },
+        {
+            --[[
+                A region a player can reach has to generate, every time.
+
+                The generator answers three failed assemble attempts with
+                the known-good fallback, and that fallback is valid by
+                construction -- so nothing fails, nothing logs, and the
+                region quietly serves one fixed layout to whoever drew the
+                unlucky seed. The Crown did it on 132 seeds in 2,000 while
+                its own validity sweep was green, because a check that asks
+                "is this manifest valid" cannot see a substitution.
+
+                Per-region sweeps live in each region's own spec; this one
+                is here because the rule is about the *open set*: whatever
+                joins it next has to arrive generating, and a region shut
+                behind its flag is allowed to be unfinished.
+            ]]
+            name = "every open region generates rather than falling back",
+            run = function()
+                local ExpeditionGenerator = require("../../src/shared/ExpeditionGenerator")
+                local Regions = require("../../src/shared/Content/Definitions/Regions")
+                for _, region in Regions do
+                    if region.enabled == true then
+                        for seed = 1, 200 do
+                            local manifest =
+                                ExpeditionGenerator.generate(seed, false, nil, region.id)
+                            TestRunner.equal(
+                                manifest.source,
+                                "generated",
+                                string.format(
+                                    "%s fell back to its known-good walk on seed %d",
+                                    region.id,
+                                    seed
+                                )
+                            )
+                        end
+                    end
+                end
             end,
         },
         {
