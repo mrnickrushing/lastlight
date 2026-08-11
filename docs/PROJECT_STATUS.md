@@ -7,8 +7,11 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = PR #388, build `0.53.2`, save schema 25,
-27 services. Published to Roblox as place version 171;
+Last updated: 2026-08-11, at `main` = `40dadf0` (PR #383), build `0.53.2`,
+save schema 25, 27 services. The last published artifact remains Roblox place
+version 171 from `5b7d4dd`; PR #383 has not been published yet. The Module 1-2
+placement follow-up is in review as PR #390 on
+`agent/bramblewake-modules-1-2-placement-fixes`;
 **#387 leaves Cinderfall shut for the third wave running, and closes the
 last route anybody had left to try.** Play mode is unreachable on this
 machine, and the two things that looked like ways around it are now
@@ -125,6 +128,20 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#390** **The Module 1-2 placement follow-up removes the defects that survived
+  #388's wider Bramblewake repair.** The arrival arch and both lanterns now
+  treat their procedural constructions as replacement fallbacks, so successful
+  authored meshes no longer double-render over them while their invisible
+  collision remains. The orchard reserves the road plus both encounter
+  sockets with four irregular verge trees instead of a collidable 3-by-3 grid,
+  and its redundant deadfall is gone. The root chapel keeps its purpose-built
+  chapel mesh instead of stacking the full hollow-shrine structure in the same
+  footprint. Module 1's arrival landmark replaces the nearby duplicate route
+  sign. `npm test` passes with **944 Luau tests**, both generated places were
+  rebuilt from the exact branch source, and the built DataModel and rollback
+  verification both pass. The latest place was opened from the terminal in
+  Studio, but the managed MCP transport was reset during the required Wine
+  teardown; do not claim a post-fix Play walk until a fresh MCP client attaches.
 - **#388** (v171) **The complete physical
   Bramblewake walk found route, readability, feedback and performance defects,
   and build `0.53.2` repairs them as one coherent pass.** The source clears tall

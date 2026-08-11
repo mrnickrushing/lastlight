@@ -1487,10 +1487,13 @@ end
 assert(criticalPaths == 24, "every Bramblewake connection needs two joined trail arms")
 assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
 assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
-assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
+-- Module 1 owns the Bramblewake arrival landmark; repeating an evacuation-road
+-- sign ten studs away made the entrance read as a sign pile. The remaining
+-- five odd modules keep the route cadence without duplicating that landmark.
+assert(roadMarkers == 5 and roadSigns == 5, "the critical route needs five direction markers")
 assert(destinationMarkers == 0, "event and extraction targets cannot use neon destination rings")
 assert(destinationCairnStones >= 12, "destinations need asymmetric physical cairn clusters")
-assert(physicalExpeditionSigns >= 7, "expedition route and arrival signs need physical framing")
+assert(physicalExpeditionSigns >= 6, "expedition route and arrival signs need physical framing")
 assert(chapterChoicePlanters == 3, "chapter decisions need three distinct physical planters")
 assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cage")
 assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")

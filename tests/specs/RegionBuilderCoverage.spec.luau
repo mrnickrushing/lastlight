@@ -144,6 +144,32 @@ return {
                     string.find(source, 'SetAttribute("ClearedRouteObstacleCount"', 1, true) ~= nil,
                     "route clearance is no longer measurable in Studio"
                 )
+                TestRunner.truthy(
+                    string.find(source, "ORCHARD_TREE_OFFSETS", 1, true) ~= nil
+                        and string.find(source, "Vector3.new(-27, 0, 21)", 1, true) ~= nil
+                        and string.find(source, "Vector3.new(29, 0, 3)", 1, true) ~= nil,
+                    "the orchard no longer reserves the road and encounter sockets"
+                )
+                TestRunner.truthy(
+                    string.find(source, "LanternGateRootArchFallback", 1, true) ~= nil
+                        and string.find(source, "fallbackInstance = fallbackInstance", 1, true)
+                            ~= nil,
+                    "the arrival gate again layers visible procedural and authored structures"
+                )
+                TestRunner.equal(
+                    string.find(source, 'dress(extra, "mesh_hollow_lantern_shrine_a"', 1, true),
+                    nil,
+                    "the root chapel again stacks a second full shrine in the same footprint"
+                )
+                TestRunner.truthy(
+                    string.find(
+                        source,
+                        "if placement.index > 1 and placement.index % 2 == 1 then",
+                        1,
+                        true
+                    ) ~= nil,
+                    "the arrival cell again duplicates its landmark with a nearby route sign"
+                )
             end,
         },
         {
