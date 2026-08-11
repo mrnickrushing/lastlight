@@ -3179,13 +3179,9 @@ local function hideProceduralPlaceholder(placeholder: Instance)
                 step stopped answering taps entirely. A part that exists
                 to be clicked keeps its queries.
             ]]
-            if
-                string.find(instance.Name, "_ClickVolume", 1, true) ~= nil
+            local isInteractionTarget = string.find(instance.Name, "_ClickVolume", 1, true) ~= nil
                 or instance:FindFirstChildOfClass("ClickDetector") ~= nil
                 or instance:FindFirstChildOfClass("ProximityPrompt") ~= nil
-            then
-                continue
-            end
             instance.Transparency = 1
             instance.CastShadow = false
             --[[
@@ -3205,7 +3201,9 @@ local function hideProceduralPlaceholder(placeholder: Instance)
                 nothing on screen to explain why. The mesh above it, or
                 the interaction's own click volume, should take that tap.
             ]]
-            instance.CanQuery = false
+            if not isInteractionTarget then
+                instance.CanQuery = false
+            end
         elseif
             instance:IsA("Light")
             or instance:IsA("ParticleEmitter")

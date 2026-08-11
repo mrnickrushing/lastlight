@@ -7,9 +7,25 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = `b0d93cf` (PR #391), build `0.53.2`,
+Last updated: 2026-08-11, at `main` = `f14fac5` (PR #392), build `0.53.2`,
 save schema 25, 27 services. Published to Roblox as place version 172 from
-`b0d93cf`; this release includes PRs #383 and #390.
+`b0d93cf`; PR #392 records that publication.
+
+**#393 repairs every placement defect found in the fresh Module 3 Briar Ring
+walk.** The ring now reserves both its incoming and outgoing roads before it
+places authored walls or collision, its primitive spines are invisible, and
+the oversized deadfall cluster is gone. The evacuation sign moves clear of the
+Heartwood stump. Hungry Homestead now hides its complete procedural shell and
+three primitive interaction props when their authored assets resolve, removes
+the duplicate supply blocks and barrel, moves its fence out of the interaction
+cluster, and uses one restrained table lantern to make the farmhouse readable.
+The fix regenerates both checked-in places and adds source and Studio regression
+coverage. `npm test` passes all 945 Luau cases plus lint, typecheck, build,
+DataModel and rollback verification. A second fresh `LastLight.rbxlx` Studio
+runtime reported Module 3 ready with seven route-aware briar walls, zero
+deadfalls, four invisible collision spines, and three hidden-but-queryable
+authored homestead interaction targets; north-entry, farmhouse and east-exit
+captures were inspected after the final rebuild.
 **#387 leaves Cinderfall shut for the third wave running, and closes the
 last route anybody had left to try.** Play mode is unreachable on this
 machine, and the two things that looked like ways around it are now
