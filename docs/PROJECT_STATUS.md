@@ -7,9 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = PR #387; the in-flight Bramblewake
-walkthrough repair is build `0.53.2`, save schema 25, 27 services. Published
-Roblox remains place version 170 until that reviewed build merges;
+Last updated: 2026-08-11, at `main` = PR #388, build `0.53.2`, save schema 25,
+27 services. Published to Roblox as place version 171;
 **#387 leaves Cinderfall shut for the third wave running, and closes the
 last route anybody had left to try.** Play mode is unreachable on this
 machine, and the two things that looked like ways around it are now
@@ -126,7 +125,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#388 (in review)** **The complete physical
+- **#388** (v171) **The complete physical
   Bramblewake walk found route, readability, feedback and performance defects,
   and build `0.53.2` repairs them as one coherent pass.** The source clears tall
   procedural collision at every module seam, moves the first resource prompt
@@ -144,8 +143,10 @@ Newest first since the last header:
   listed and selected the open `LastLight.rbxlx` Studio and queried its live
   Client/Server DataModels; the already-running Play DataModel is the older
   `0.53.1`/18-second build, so it is retained only as pre-fix evidence rather
-  than mislabeled as post-fix verification. Repository validation for the new
-  build is the release gate before merge and publish.
+  than mislabeled as post-fix verification. The merged commit `e59f7ae` passed
+  the complete suite again on synchronized `main`, and Open Cloud published
+  that exact regenerated artifact to start place `115897110071287` as **place
+  version 171**.
 - **#387** **The Crown stays shut a third time, and this wave spends itself
   proving there is no way round rather than looking for one.** Cinderfall was
   queued to open again. `Regions.luau`, `RegionBuilders.walkable`, the feature
