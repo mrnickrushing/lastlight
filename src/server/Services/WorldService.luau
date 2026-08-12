@@ -4630,7 +4630,16 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     -- platform sits at lower Z than the spawn. The old 180-degree yaw did
     -- the opposite of this comment's promise and greeted every new player
     -- with a close-up of the hearth wall.
-    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 12))
+    --
+    -- halfDepth - 18, not - 12: the default third-person camera trails
+    -- roughly 11-12 studs behind its target, and LodgeHearth's own front
+    -- face sits 7.4 studs from a - 12 spawn -- inside the trailing
+    -- distance, so the fixed yaw above still opened on the camera wedged
+    -- into the hearth and the wall behind it. - 18 clears the hearth by
+    -- 13.4 studs, which is the same "close-up of the hearth wall" bug the
+    -- yaw fix above was for, measured against the camera rather than the
+    -- facing.
+    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 18))
     lobbySpawn.Transparency = 1
     lobbySpawn.Anchored = true
     lobbySpawn.CanCollide = true
@@ -5102,11 +5111,20 @@ function WorldService._buildMara(self: WorldService, world: Model)
             false
         )
     end
+    --[[
+        scale 0.75, not 1.15: the fallback above is a 13.6-stud trunk, sized
+        to lie across Mara at waist height. mesh_deadfall_a's native longest
+        dimension is ~15 studs, so 1.15 scale times the 1.18 profileScale.X
+        stretched the authored replacement to ~20 studs -- a felled tree
+        spanning the whole road and, at Mara's own interaction distance,
+        wide enough to put the third-person camera inside it. 0.75 lands the
+        authored mesh at the same ~13-14 studs the fallback was built to.
+    ]]
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
         position = Vector3.new(-3, 1.9, -30),
-        scale = 1.15,
+        scale = 0.75,
         yaw = math.rad(90),
         seed = 9320,
         swayTag = nil,

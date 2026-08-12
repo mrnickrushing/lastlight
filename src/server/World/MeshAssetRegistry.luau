@@ -394,14 +394,23 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = false,
     },
-    -- The cap/handle MeshPart (0.36 x 0.84 x 1.01) ships welded on at a
-    -- compound tilt (measured up-vector dot with world-up of -0.94, roughly
-    -- 160 degrees from upright) while the body it sits directly on top of
-    -- (1.10 x 1.97 x 1.10) is correctly upright. Every placement of this
-    -- lantern -- there are dozens across Bramblewake alone -- ships with an
-    -- inverted cap. Fixed by copying the body's orientation onto the cap at
-    -- template load; the Roundtable-audit finding this closed is the
-    -- Bramblewake walkthrough of 2026-08-11.
+    -- The cap/handle MeshPart ships welded on at a compound tilt (measured
+    -- up-vector dot with world-up of -0.94, roughly 160 degrees from
+    -- upright) while the body it sits directly on top of is correctly
+    -- upright. Every placement of this lantern -- there are dozens across
+    -- Bramblewake alone -- ships with an inverted cap. Fixed by copying the
+    -- body's orientation onto the cap at template load; the Roundtable-audit
+    -- finding this closed is the Bramblewake walkthrough of 2026-08-11.
+    --
+    -- matchSize/copyOrientationFromSize re-measured live in Studio during
+    -- the 2026-08-12 First Light -> Bramblewake -> Ironroot Delve
+    -- walkthrough: `mesh_orientation_fix_part_not_found` was firing at boot
+    -- for this asset, because the Creator Store import had drifted ~15%
+    -- smaller on every sub-part since these values were captured (findable
+    -- against a 0.01-stud match epsilon, not against a person's eye), and a
+    -- consistent per-axis ratio across both the cap and the body confirms
+    -- it's the same two parts, just resized upstream rather than
+    -- restructured.
     {
         id = "mesh_creator_kerosene_lantern_a",
         assetId = 11865884168,
@@ -414,11 +423,11 @@ local ENTRIES: { Entry } = {
         creatorStore = true,
         partOrientationFixes = {
             {
-                matchSize = { 0.35983961820602417, 0.8399349451065063, 1.007790446281433 },
+                matchSize = { 0.31290403008461, 0.7303782105445862, 0.8763394951820374 },
                 copyOrientationFromSize = {
-                    1.1010892391204834,
-                    1.9716554880142212,
-                    1.1010887622833252,
+                    0.9574689269065857,
+                    1.7144830226898194,
+                    0.957468569278717,
                 },
             },
         },

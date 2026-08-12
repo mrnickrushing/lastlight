@@ -406,7 +406,16 @@ function RegionExpeditionAssembly.build(
             column.Material = Enum.Material.Neon
             column.Transparency = 0.35
             column.Anchored = true
-            column.CanCollide = false
+            -- CanCollide true, not false: a Neon column at 0.35 transparency
+            -- is bright by design ("a lit column a player can see across the
+            -- wood"), and with no collision a player closing on the
+            -- interaction it carries could walk straight inside the shaft,
+            -- putting the third-person camera in the middle of it -- the
+            -- screen fills with blown-out light instead of showing the
+            -- landmark. Every other interactable in the game (Mara, the
+            -- destination planks, the Wayhome Gate mesh) is solid for the
+            -- same reason.
+            column.CanCollide = true
             column:SetAttribute("ContentId", placement.moduleId)
             column:SetAttribute("ExtractionId", "extraction_" .. nodePrefix .. "_wayhome")
             CollectionService:AddTag(column, runtimeIds.ExpeditionExtractionTag)

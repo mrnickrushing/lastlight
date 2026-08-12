@@ -752,6 +752,25 @@ function RegionBuilders.buildWayfinding(
             cue.CastShadow = false
             cue.Transparency = 0.55
             cue.Parent = parent
+            --[[
+                Neon self-illuminates the part it's painted on and nothing
+                else -- it ignores ambient shading but casts no light onto
+                the floor or walls around it. Every module-visual dressing
+                elsewhere in these regions pairs a Neon glow with a real
+                PointLight (IronrootBuilder.glow, Bramblewake's lantern);
+                this trail marker -- the one guaranteed light source on
+                every route, including the "dark_stretch"-style rooms that
+                carry no fixture of their own -- was the one place that
+                pairing was missing, which is why five studs from a marker
+                the room was unreadable even though the marker itself was
+                lit.
+            ]]
+            local trailLight = Instance.new("PointLight")
+            trailLight.Color = glowColor
+            trailLight.Brightness = 1.6
+            trailLight.Range = 16
+            trailLight.Shadows = false
+            trailLight.Parent = cue
             placed += 1
         end
     end
