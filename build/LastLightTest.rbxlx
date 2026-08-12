@@ -70765,7 +70765,16 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     -- platform sits at lower Z than the spawn. The old 180-degree yaw did
     -- the opposite of this comment's promise and greeted every new player
     -- with a close-up of the hearth wall.
-    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 12))
+    --
+    -- halfDepth - 18, not - 12: the default third-person camera trails
+    -- roughly 11-12 studs behind its target, and LodgeHearth's own front
+    -- face sits 7.4 studs from a - 12 spawn -- inside the trailing
+    -- distance, so the fixed yaw above still opened on the camera wedged
+    -- into the hearth and the wall behind it. - 18 clears the hearth by
+    -- 13.4 studs, which is the same "close-up of the hearth wall" bug the
+    -- yaw fix above was for, measured against the camera rather than the
+    -- facing.
+    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 18))
     lobbySpawn.Transparency = 1
     lobbySpawn.Anchored = true
     lobbySpawn.CanCollide = true
@@ -71237,11 +71246,20 @@ function WorldService._buildMara(self: WorldService, world: Model)
             false
         )
     end
+    --[[
+        scale 0.75, not 1.15: the fallback above is a 13.6-stud trunk, sized
+        to lie across Mara at waist height. mesh_deadfall_a's native longest
+        dimension is ~15 studs, so 1.15 scale times the 1.18 profileScale.X
+        stretched the authored replacement to ~20 studs -- a felled tree
+        spanning the whole road and, at Mara's own interaction distance,
+        wide enough to put the third-person camera inside it. 0.75 lands the
+        authored mesh at the same ~13-14 studs the fallback was built to.
+    ]]
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
         position = Vector3.new(-3, 1.9, -30),
-        scale = 1.15,
+        scale = 0.75,
         yaw = math.rad(90),
         seed = 9320,
         swayTag = nil,
@@ -91833,14 +91851,23 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = false,
     },
-    -- The cap/handle MeshPart (0.36 x 0.84 x 1.01) ships welded on at a
-    -- compound tilt (measured up-vector dot with world-up of -0.94, roughly
-    -- 160 degrees from upright) while the body it sits directly on top of
-    -- (1.10 x 1.97 x 1.10) is correctly upright. Every placement of this
-    -- lantern -- there are dozens across Bramblewake alone -- ships with an
-    -- inverted cap. Fixed by copying the body's orientation onto the cap at
-    -- template load; the Roundtable-audit finding this closed is the
-    -- Bramblewake walkthrough of 2026-08-11.
+    -- The cap/handle MeshPart ships welded on at a compound tilt (measured
+    -- up-vector dot with world-up of -0.94, roughly 160 degrees from
+    -- upright) while the body it sits directly on top of is correctly
+    -- upright. Every placement of this lantern -- there are dozens across
+    -- Bramblewake alone -- ships with an inverted cap. Fixed by copying the
+    -- body's orientation onto the cap at template load; the Roundtable-audit
+    -- finding this closed is the Bramblewake walkthrough of 2026-08-11.
+    --
+    -- matchSize/copyOrientationFromSize re-measured live in Studio during
+    -- the 2026-08-12 First Light -> Bramblewake -> Ironroot Delve
+    -- walkthrough: `mesh_orientation_fix_part_not_found` was firing at boot
+    -- for this asset, because the Creator Store import had drifted ~15%
+    -- smaller on every sub-part since these values were captured (findable
+    -- against a 0.01-stud match epsilon, not against a person's eye), and a
+    -- consistent per-axis ratio across both the cap and the body confirms
+    -- it's the same two parts, just resized upstream rather than
+    -- restructured.
     {
         id = "mesh_creator_kerosene_lantern_a",
         assetId = 11865884168,
@@ -91853,11 +91880,11 @@ local ENTRIES: { Entry } = {
         creatorStore = true,
         partOrientationFixes = {
             {
-                matchSize = { 0.35983961820602417, 0.8399349451065063, 1.007790446281433 },
+                matchSize = { 0.31290403008461, 0.7303782105445862, 0.8763394951820374 },
                 copyOrientationFromSize = {
-                    1.1010892391204834,
-                    1.9716554880142212,
-                    1.1010887622833252,
+                    0.9574689269065857,
+                    1.7144830226898194,
+                    0.957468569278717,
                 },
             },
         },
@@ -94586,6 +94613,25 @@ function RegionBuilders.buildWayfinding(
             cue.CastShadow = false
             cue.Transparency = 0.55
             cue.Parent = parent
+            --[[
+                Neon self-illuminates the part it's painted on and nothing
+                else -- it ignores ambient shading but casts no light onto
+                the floor or walls around it. Every module-visual dressing
+                elsewhere in these regions pairs a Neon glow with a real
+                PointLight (IronrootBuilder.glow, Bramblewake's lantern);
+                this trail marker -- the one guaranteed light source on
+                every route, including the "dark_stretch"-style rooms that
+                carry no fixture of their own -- was the one place that
+                pairing was missing, which is why five studs from a marker
+                the room was unreadable even though the marker itself was
+                lit.
+            ]]
+            local trailLight = Instance.new("PointLight")
+            trailLight.Color = glowColor
+            trailLight.Brightness = 1.6
+            trailLight.Range = 16
+            trailLight.Shadows = false
+            trailLight.Parent = cue
             placed += 1
         end
     end
@@ -95035,7 +95081,16 @@ function RegionExpeditionAssembly.build(
             column.Material = Enum.Material.Neon
             column.Transparency = 0.35
             column.Anchored = true
-            column.CanCollide = false
+            -- CanCollide true, not false: a Neon column at 0.35 transparency
+            -- is bright by design ("a lit column a player can see across the
+            -- wood"), and with no collision a player closing on the
+            -- interaction it carries could walk straight inside the shaft,
+            -- putting the third-person camera in the middle of it -- the
+            -- screen fills with blown-out light instead of showing the
+            -- landmark. Every other interactable in the game (Mara, the
+            -- destination planks, the Wayhome Gate mesh) is solid for the
+            -- same reason.
+            column.CanCollide = true
             column:SetAttribute("ContentId", placement.moduleId)
             column:SetAttribute("ExtractionId", "extraction_" .. nodePrefix .. "_wayhome")
             CollectionService:AddTag(column, runtimeIds.ExpeditionExtractionTag)
