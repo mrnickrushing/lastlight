@@ -7,9 +7,57 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-11, at `main` = `f14fac5` (PR #392), build `0.53.2`,
-save schema 25, 27 services. Published to Roblox as place version 172 from
-`b0d93cf`; PR #392 records that publication.
+Last updated: 2026-08-12, at `main` = `3beb0ae` (PR #394), build `0.53.2`,
+save schema 25, 27 services. Published to Roblox as place version 173 from
+`8c74558`; this entry records that publication.
+
+**#394 fixes five defects a continuous live-Studio walkthrough found and
+confirms a sixth wasn't a bug.** The walk went further than any single
+prior session: loading screen through Emberhollow, the whole of
+Bramblewake's critical path to its Wayhome Gate, and — reaching a
+second region live for the first time — the whole of Ironroot Delve's
+critical path to its own extraction point, built through the same
+`RegionExpeditionAssembly` path a real departure uses. Five findings
+were measured rather than eyeballed and fixed: the Emberhollow lobby's
+spawn sat 7.4 studs from `LodgeHearth`'s front face, inside the default
+camera's ~11-12 stud trailing distance, so the first frame a new
+player saw was the camera wedged into the hearth and the wall behind
+it (moved 6 studs back). Mara's fallen-roots rescue obstacle's
+authored-mesh replacement rendered at ~20 studs against a 13.6-stud
+fallback built to lie across her at waist height — a felled tree
+spanning the whole road — and is rescaled to match. The generic
+extraction beacon every `RegionExpeditionAssembly` region places
+(Ironroot, Mireglass, Frostmere, Tempest, Cinderfall) was
+non-collidable, so closing on its own interaction let a player walk
+inside the lit Neon column and fill the screen with blown-out light;
+it is solid now, like every other interactable in the game. Those same
+five regions' wayfinding trail markers — the one guaranteed light
+source on a module-to-module route — were Neon material with no
+`PointLight`, so they lit themselves and nothing around them; each now
+carries a real light. And `mesh_creator_kerosene_lantern_a`'s
+orientation-fix table had drifted ~15% out of its 0.01-stud match
+tolerance against the current Creator Store import, silently disabling
+the fix that keeps its cap upright, corrected against live-measured
+sizes. A sixth finding — the departure lobby's party-size button
+looked unresponsive to synthetic clicks during testing — was
+investigated rather than patched: `PlayerGui:GetGuiObjectsAtPosition`
+confirmed the button is the topmost, correctly-hit-tested object at
+its own click point with nothing blocking it, so the symptom traced to
+the walkthrough's own input-automation tooling rather than to game
+code, and nothing was changed there. **945 Luau tests**, every
+repository validator, and both regenerated places all pass. The exact
+merged commit `8c74558` was rebuilt and passed the full suite again on
+synchronized `main`, then Open Cloud published that artifact to start
+place `115897110071287` as **place version 173**.
+
+Two items the walk raised are recorded open rather than guessed at: the
+forest-sign orientation-fix table has drifted the same way the lantern's
+had, but its live part composition no longer cleanly maps to the
+recorded target and guessing which sub-part to flip risks a real visual
+bug in exchange for silencing a cosmetic boot-time warning. And
+sustained client FPS sat pinned around 15 with 260-950ms frame spikes
+for the whole walk, in both the town and both expeditions — a
+profiling-scale investigation this wave didn't attempt.
 
 **#393 repairs every placement defect found in the fresh Module 3 Briar Ring
 walk.** The ring now reserves both its incoming and outgoing roads before it
