@@ -3922,6 +3922,14 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             lampLight.Color = AMBER
             lampLight.Brightness = 0.5
             lampLight.Range = 20
+            -- Shadows off, same discipline Bramblewake's own light() helper
+            -- documents: only a handful of hero fixtures (the hearth, the
+            -- platform) are worth a real-time shadow map, and ambient wall
+            -- lamps are not one of them. Four of these sit in the one room
+            -- every player spawns into, unshadowed by omission rather than
+            -- by choice -- a measured contributor to this room's own frame
+            -- cost, on top of everything else about it.
+            lampLight.Shadows = false
             lampLight.Parent = lamp
             CollectionService:AddTag(lamp, self._runtimeIds.AmbientLightTag)
         end
@@ -4141,6 +4149,11 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         lampLight.Color = AMBER
         lampLight.Brightness = 0.6
         lampLight.Range = 14
+        -- Shadows off: up to four of these ring the departure platform, in
+        -- the same room as the four LodgeLamp fixtures above -- the same
+        -- unshadowed-by-omission gap, in the same room every player starts
+        -- and returns to.
+        lampLight.Shadows = false
         lampLight.Parent = lampGlow
     end
     addBillboard(platform, Strings.get("world.stand_here_to_depart"), AMBER, 120)
