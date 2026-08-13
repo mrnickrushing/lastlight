@@ -7,9 +7,38 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-12, at `main` = `3beb0ae` (PR #394), build `0.53.2`,
-save schema 25, 27 services. Published to Roblox as place version 173 from
-`8c74558`; this entry records that publication.
+Last updated: 2026-08-12, at `main` = `219fbc6` (PR #396), build `0.53.2`,
+save schema 25, 27 services. Published to Roblox as place version 174 from
+`b82ff48`; this entry records that publication.
+
+**#396 closes the two items #394 left open rather than guess at.** Client
+FPS had sat pinned around 15fps with 260-950ms frame spikes for the whole
+of that walkthrough, from the first frame in the Emberhollow lobby
+onward — a symptom the wave flagged as a profiling-scale follow-up
+rather than fold in unmeasured. Auditing every light-creation site in
+the codebase against Bramblewake's own already-documented discipline
+("shadows off unless a light is asked to cast them... only a
+handful... ask for it") found the answer sitting in that same lobby:
+eight `PointLight`s — the four `LodgeLamp` wall fixtures and up to four
+`DepartureLanternPost` lamps ringing the departure platform — left
+shadow-casting by omission, the one place in the game that pattern
+wasn't followed. Real-time shadow maps are a per-frame cost under
+Future lighting; eight of them in the one room every player starts and
+returns to is now `Shadows = false` like every other ambient fixture
+in the game, and the extraction beacon's intentionally-shadowed hero
+glow and all five region builders' shared `glow()` helpers were
+confirmed already correct and left untouched. And
+`mesh_creator_forest_sign_a`'s orientation-fix table — drifted the
+same way the kerosene lantern's had, but left open in #394 because the
+live part composition didn't cleanly match the recorded target —
+is fixed now that it's measured the way "upside down" actually means
+something: `CFrame.UpVector:Dot(Vector3.new(0, 1, 0))` reads -1 for the
+lower signboard and +1 for the upper one, and the corrected `matchSize`
+finds the -1 board precisely. **945 Luau tests**, every repository
+validator, and both regenerated places all pass. The exact merged
+commit `b82ff48` was rebuilt and passed the full suite again on
+synchronized `main`, then Open Cloud published that artifact to start
+place `115897110071287` as **place version 174**.
 
 **#394 fixes five defects a continuous live-Studio walkthrough found and
 confirms a sixth wasn't a bug.** The walk went further than any single
