@@ -507,15 +507,23 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = true,
     },
-    -- The lower signboard Union (2.20 x 0.49 x 0.07) ships rotated 180
-    -- degrees about its own length axis relative to the upper signboard
-    -- Union on the same post (0.07 x 0.49 x 2.20, correctly oriented) --
-    -- both boards' length axes already point the same way in world space,
-    -- only the lower one reads upside down. Confirmed against every
-    -- placement in the Bramblewake stag-tracks event (2026-08-11 walkthrough),
-    -- so this is a template defect, not a per-placement one. Fixed by
-    -- flipping the lower board 180 degrees about its own local X axis
-    -- (its length axis), which does not move it.
+    -- The lower signboard Union ships rotated 180 degrees about its own
+    -- length axis relative to the upper signboard Union on the same post
+    -- (correctly oriented) -- both boards' length axes already point the
+    -- same way in world space, only the lower one reads upside down.
+    -- Confirmed against every placement in the Bramblewake stag-tracks
+    -- event (2026-08-11 walkthrough), so this is a template defect, not a
+    -- per-placement one. Fixed by flipping the lower board 180 degrees
+    -- about its own local X axis (its length axis), which does not move it.
+    --
+    -- matchSize re-measured live in Studio during the 2026-08-12 walkthrough
+    -- follow-up: `mesh_orientation_fix_part_not_found` was firing at boot
+    -- for this asset too, for the same reason as the kerosene lantern's --
+    -- the Creator Store import had drifted since these values were
+    -- captured. This time confirmed by more than a size match: the two
+    -- boards' `CFrame.UpVector:Dot(Vector3.new(0, 1, 0))` read -1 and +1
+    -- respectively, which is what "upside down" means in the world rather
+    -- than in a size table, and the -1 board is the one this fix now finds.
     {
         id = "mesh_creator_forest_sign_a",
         assetId = 82202632313902,
@@ -528,7 +536,7 @@ local ENTRIES: { Entry } = {
         creatorStore = true,
         partOrientationFixes = {
             {
-                matchSize = { 2.1965529918670654, 0.4913640022277832, 0.0657959058880806 },
+                matchSize = { 3.660921573638916, 0.8189399838447571, 0.1096598356962204 },
                 localRotationDegrees = { 180, 0, 0 },
             },
         },
