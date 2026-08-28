@@ -162,23 +162,37 @@ function CommerceService._readMailbox(self: CommerceService, userId: number): { 
 end
 
 --[[
-    Write a mailbox and say whether it landed.
+    Rewrite a mailbox from whatever is stored right now, and say whether it
+    landed.
+
+    UpdateAsync rather than a read then a SetAsync. A receipt is retried until
+    it is acknowledged, and those retries can reach a different server than the
+    one draining the same mailbox -- so two servers can hold the same key, and
+    with a plain read-then-write whichever writes second erases the other's
+    change. That is a purchase the player has already paid for. UpdateAsync
+    hands the transform the value it just read and retries on conflict, so the
+    merge happens against current data instead of a stale copy.
+
+    The transform must be pure: DataStore may call it more than once.
 
     The boolean is load-bearing: it is the difference between telling the
     platform the purchase is safe and telling it to call again. A failed write
     must never read as success.
 ]]
-function CommerceService._writeMailbox(
+function CommerceService._updateMailbox(
     self: CommerceService,
     userId: number,
-    mailbox: { any }
+    transform: ({ any }) -> { any }
 ): boolean
     if not self._persistent or self._mailboxStore == nil then
-        self._localMailboxes[userId] = mailbox
+        local current = self._entitlements.normalizeMailbox(self._localMailboxes[userId])
+        self._localMailboxes[userId] = transform(current)
         return true
     end
     local ok, err = pcall(function()
-        self._mailboxStore:SetAsync(mailboxKey(userId), mailbox)
+        self._mailboxStore:UpdateAsync(mailboxKey(userId), function(stored: any): { any }
+            return transform(self._entitlements.normalizeMailbox(stored))
+        end)
     end)
     if not ok then
         self._logger:warn(
@@ -242,7 +256,7 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             "unresolvable_product"
         )
     end
-    local nextState, nextMailbox, verdict = self._entitlements.route(
+    local nextState, _nextMailbox, verdict = self._entitlements.route(
         state,
         mailbox,
         receipt,
@@ -296,7 +310,22 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
     end
 
     if verdict == "held" then
-        if not self:_writeMailbox(userId, nextMailbox) then
+        -- Routed again inside the update against the mailbox the store just
+        -- handed back, rather than writing the copy computed from the read
+        -- above. `route` is pure, so re-running it merges this receipt into
+        -- whatever another server has parked meanwhile instead of erasing it.
+        local held = self:_updateMailbox(userId, function(stored: { any }): { any }
+            local _, merged = self._entitlements.route(
+                state,
+                stored,
+                receipt,
+                function(productId: string): { string }
+                    return self._catalog.grantsOf(productId)
+                end
+            )
+            return merged
+        end)
+        if not held then
             return false
         end
         self._logger:info("commerce_receipt_held", {
@@ -368,7 +397,30 @@ function CommerceService.drainFor(self: CommerceService, player: Player)
         self._logger:warn("commerce_drain_write_failed", { user = player.UserId })
         return
     end
-    self:_writeMailbox(player.UserId, remaining)
+    -- Remove exactly the receipts this drain consumed, keeping anything a
+    -- concurrent server parked between the read above and this write.
+    self:_updateMailbox(player.UserId, function(stored: { any }): { any }
+        local consumed: { [string]: boolean } = {}
+        for _, receipt in mailbox do
+            consumed[tostring(receipt.purchaseId)] = true
+        end
+        for _, receipt in remaining do
+            consumed[tostring(receipt.purchaseId)] = nil
+        end
+        local merged = table.clone(remaining)
+        local present: { [string]: boolean } = {}
+        for _, receipt in merged do
+            present[tostring(receipt.purchaseId)] = true
+        end
+        for _, receipt in stored do
+            local purchaseId = tostring(receipt.purchaseId)
+            if not consumed[purchaseId] and not present[purchaseId] then
+                present[purchaseId] = true
+                table.insert(merged, receipt)
+            end
+        end
+        return merged
+    end)
     self._logger:info("commerce_mailbox_drained", {
         granted = #granted,
         remaining = #remaining,
